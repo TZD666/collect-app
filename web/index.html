@@ -151,7 +151,9 @@
   <div class="logo"><span class="dot"></span><span>笔记台 · 收集</span></div>
   <div class="spacer"></div>
   <span style="font-size:12px;color:var(--ink3)" id="statLine"></span>
+  <span class="hidden" style="font-size:12px;color:var(--ink2)" id="whoami"></span>
   <button class="btn btn-ghost" onclick="location.href='/settings.html'">⚙ 设置</button>
+  <button class="btn btn-ghost hidden" id="logoutBtn" onclick="doLogout()" title="登出当前账号，切换用户">⎋ 登出</button>
   <button class="btn btn-line" onclick="gc()">🧹 清理无星</button>
   <button class="btn btn-line" onclick="runCrawl()" id="crawlBtn">⟳ 手动抓取</button>
   <button class="btn btn-line" onclick="location.href='/starred.html'">★ 重点新闻</button>
@@ -506,6 +508,13 @@ async function gc(){
   catch(e){ toast(e.message); }
 }
 
+// ── 登出（multi 模式）──
+async function doLogout(){
+  if(!confirm('登出当前账号？')) return;
+  try{ await api('/auth/logout',{}); }catch(e){}  // 即使接口异常也回登录页
+  location.href='/login.html';
+}
+
 // ── 收集管家聊天（SSE 流式）──
 let chatHistory=[], chatBusy=false, chatGreeted=false;
 function openChat(){
@@ -590,7 +599,16 @@ async function chatSend(){
 
 // ── 启动 ──
 (async function(){
-  try{ await fetch('/api/info'); }catch(e){ toast('服务未连接，请先启动 run.py'); }
+  // multi 模式：顶栏显示当前用户 + 登出按钮（single 模式无登录概念，不显示）
+  try{
+    const info=await (await fetch('/api/info')).json();
+    if(info.auth_mode==='multi'){
+      document.getElementById('logoutBtn').classList.remove('hidden');
+      try{ const me=await api('/auth/me',{});
+        const w=document.getElementById('whoami'); w.textContent='👤 '+me.username; w.classList.remove('hidden');
+      }catch(e){}  // 未登录时 api() 已自动跳 /login.html
+    }
+  }catch(e){ toast('服务未连接，请先启动 run.py'); }
   freqChanged(); renderTimes(); await loadSources(); await loadFeed();
   // 自动接上最近的活跃接入任务（刷新/服务重启后小窗续命，外部工作者的实时日志也能看到）
   try{

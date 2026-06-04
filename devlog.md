@@ -50,3 +50,4 @@
 - 【修复·M6】COOKIE_SECURE 可配（config + .env.example），set_cookie 加 secure。
 - 【收尾】run.py setdefault PYTHONUNBUFFERED；调度循环 print 加 flush；db._migrate_source_unique f-string 处注释「collist 来自 PRAGMA，无注入面」。
 - 【测试】pytest 43 绿（新增 enc2 随机性/enc1 兼容/feed 三函数越权防线）；`from app import main` 通过；8777 实测 list 正常、text/plain→422、json→200、enc2 往返成功；app/ web/ 无 `/Users/edy`。
+- 【修复】用户实测发现缺口：后端 /auth/logout 早已就绪但前端无登出入口（多 agent 拼接缝漏点）。index 顶栏补「⎋ 登出」按钮 + 👤 当前用户名（仅 multi 模式显示），curl 全链路验证注册→me→登出→401 通过

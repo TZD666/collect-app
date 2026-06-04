@@ -30,3 +30,9 @@
   - 新建 `README.md`（全中文，快速开始 A 本地/B Docker，AI 配置三通道说明，配置项表格，安全提示，架构简图）。
   - 新建 `devlog.md`（本文件，独立账本）。
   - 删除旧遗留文件：server.py、收集.html、重点新闻.html、总结.html、收集/ 目录（含旧 data/fulltext 副本，根目录已有新副本）。
+
+## 2026-06-04（续）
+- 【改动】波次3：收集管家聊天上线（/api/assistant/chat SSE 流式 + 服务端注入近7天 feed 快照 + index 右下角抽屉打字机 UI）
+- 【测试】最小 pytest 套件 38 绿（db 多租户隔离 27 + auth/加密 11），conftest 拦截 DB_FILE 保证不碰真实库
+- 【文档】CLAUDE.md/AGENTS.md 重写为新架构交接文档；旧版描述的 8 颗钉子全部解除
+- 【里程碑】进入最终自检验收：独立 verifier 跑验收矩阵 + code-reviewer 独立审查

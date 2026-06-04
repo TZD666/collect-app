@@ -7,7 +7,7 @@
 cli_path 解析优先级：
   1. cfg["cli_path"]（非空）
   2. shutil.which("claude")（PATH 探测）
-  3. 找不到 → available = False，调用时抛中文 RuntimeError
+  找不到 → available = False，调用时抛中文 RuntimeError
 
 stream() 说明：
   CLI 不支持真流式输出。stream() 的实现是一次性调用 complete()，
@@ -27,9 +27,6 @@ from typing import Generator
 
 from app.llm.base import LLMProvider
 
-# 固定兜底路径（本机历史遗留；PATH 探测失败时最后尝试）
-_FALLBACK_BIN = "/Users/edy/.local/bin/claude"
-
 
 class ClaudeCLIProvider(LLMProvider):
     """本机 claude CLI 通道。
@@ -38,15 +35,10 @@ class ClaudeCLIProvider(LLMProvider):
     """
 
     def __init__(self, cfg: dict):
-        # 优先 cfg 里的路径，其次 PATH 探测，最后兜底固定路径
+        # 优先 cfg 里的路径，其次 PATH 探测
         cli_path = (cfg.get("cli_path") or "").strip()
         if not cli_path:
             cli_path = shutil.which("claude") or ""
-        if not cli_path:
-            # 兜底：尝试历史固定路径
-            import os
-            if os.path.isfile(_FALLBACK_BIN) and os.access(_FALLBACK_BIN, os.X_OK):
-                cli_path = _FALLBACK_BIN
         self._cli_path = cli_path
         self._model = (cfg.get("model") or "").strip()
         self.available = bool(cli_path)

@@ -74,47 +74,65 @@ def login(conn, username: str, password: str) -> str:
 
 
 # ── API Key 轻量加密 ───────────────────────────────────────────
-# 用 SECRET_KEY 派生 HMAC-SHA256 keystream，与明文 XOR 后 base64。格式 "enc1$<b64>"。
+# 用 SECRET_KEY + 每条随机 salt 派生 HMAC-SHA256 keystream，与明文 XOR 后 base64。
+# 格式 "enc2$<salt_hex>$<b64>"——每条 salt 不同，keystream 不再固定，
+# 杜绝「知道自己明文即可解他人密文」的同流复用风险。
+# 兼容旧 "enc1$<b64>"（固定 keystream，无 salt）与无前缀明文。
 # SECRET_KEY 为空时退化为明文存储（README 层面提示用户配置 SECRET_KEY）。
 # 诚实标注：这是轻量混淆，只防库文件被翻到时一眼看到明文；非抗攻击级加密。
-_ENC_PREFIX = "enc1$"
+_ENC2_PREFIX = "enc2$"
+_ENC1_PREFIX = "enc1$"
 
 
-def _keystream(length: int) -> bytes:
-    """HMAC-SHA256(SECRET_KEY, counter) 拼接成所需长度的 keystream。"""
+def _keystream(length: int, salt: bytes = b"") -> bytes:
+    """HMAC-SHA256(SECRET_KEY, salt + counter) 拼接成所需长度的 keystream。
+    salt=b'' 时即旧 enc1 的固定 keystream（仅 dec 旧格式时用）。"""
     key = (settings.SECRET_KEY or "").encode("utf-8")
     out = b""
     counter = 0
     while len(out) < length:
-        out += hmac.new(key, counter.to_bytes(4, "big"), hashlib.sha256).digest()
+        out += hmac.new(key, salt + counter.to_bytes(4, "big"), hashlib.sha256).digest()
         counter += 1
     return out[:length]
 
 
 def enc_secret(plain: str) -> str:
-    """加密明文 → "enc1$<b64>"。SECRET_KEY 为空则原样返回明文（不加前缀）。"""
+    """加密明文 → "enc2$<salt_hex>$<b64>"。SECRET_KEY 为空则原样返回明文（不加前缀）。"""
     if not plain:
         return ""
     if not settings.SECRET_KEY:
         return plain  # 无密钥：明文存储（README 提示配置 SECRET_KEY）
+    salt = os.urandom(16)
     data = plain.encode("utf-8")
-    ks = _keystream(len(data))
+    ks = _keystream(len(data), salt)
     xored = bytes(a ^ b for a, b in zip(data, ks))
-    return _ENC_PREFIX + base64.b64encode(xored).decode("ascii")
+    return f"{_ENC2_PREFIX}{salt.hex()}${base64.b64encode(xored).decode('ascii')}"
 
 
 def dec_secret(cipher: str) -> str:
-    """解密 "enc1$<b64>" → 明文。无前缀视为明文（兼容旧值/无密钥存储）。"""
+    """解密。兼容三种格式：
+      · "enc2$<salt_hex>$<b64>"（新，每条随机 salt）
+      · "enc1$<b64>"（旧，固定 keystream 无 salt）
+      · 无前缀（明文，兼容旧值/无密钥存储）。"""
     if not cipher:
         return ""
-    if not cipher.startswith(_ENC_PREFIX):
-        return cipher  # 明文兼容
-    try:
-        xored = base64.b64decode(cipher[len(_ENC_PREFIX):])
-        ks = _keystream(len(xored))
-        return bytes(a ^ b for a, b in zip(xored, ks)).decode("utf-8")
-    except Exception:
-        return ""  # 密钥变更/数据损坏 → 视为未配置
+    if cipher.startswith(_ENC2_PREFIX):
+        try:
+            salt_hex, b64 = cipher[len(_ENC2_PREFIX):].split("$", 1)
+            salt = bytes.fromhex(salt_hex)
+            xored = base64.b64decode(b64)
+            ks = _keystream(len(xored), salt)
+            return bytes(a ^ b for a, b in zip(xored, ks)).decode("utf-8")
+        except Exception:
+            return ""  # 密钥变更/数据损坏 → 视为未配置
+    if cipher.startswith(_ENC1_PREFIX):
+        try:
+            xored = base64.b64decode(cipher[len(_ENC1_PREFIX):])
+            ks = _keystream(len(xored))  # salt=b''：旧固定 keystream
+            return bytes(a ^ b for a, b in zip(xored, ks)).decode("utf-8")
+        except Exception:
+            return ""
+    return cipher  # 明文兼容
 
 
 # ── AI 配置解析 ────────────────────────────────────────────────

@@ -91,6 +91,8 @@ class Settings:
     # 注册开关 / 会话密钥
     ALLOW_REGISTER = _env_bool("ALLOW_REGISTER", True)
     SECRET_KEY = _env("SECRET_KEY", "")
+    # session cookie 是否加 Secure 标志（HTTPS 部署时设 true）
+    COOKIE_SECURE = _env_bool("COOKIE_SECURE", False)
 
     def resolved_claude_bin(self):
         """CLAUDE_BIN 非空直接用；空则 PATH 探测 'claude'，找不到返回 ''。"""

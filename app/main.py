@@ -36,7 +36,7 @@ def _scheduler_loop():
         try:
             crawler.run()
         except Exception as e:
-            print(f"[收集调度] 抓取异常：{e}")
+            print(f"[收集调度] 抓取异常：{e}", flush=True)
         try:
             conn = db.connect()
             db.init_db(conn)
@@ -46,10 +46,10 @@ def _scheduler_loop():
                 n = db.gc_read(conn)         # 全用户一起清已读无星
                 db.session_gc(conn)          # 顺手清过期会话
                 db.meta_set(conn, "last_read_clean", today)
-                print(f"[收集调度] 2:00 已读清理：{n} 条")
+                print(f"[收集调度] 2:00 已读清理：{n} 条", flush=True)
             conn.close()
         except Exception as e:
-            print(f"[收集调度] 清理异常：{e}")
+            print(f"[收集调度] 清理异常：{e}", flush=True)
         _stop_event.wait(60)
 
 
@@ -63,6 +63,9 @@ async def lifespan(app: FastAPI):
     conn = db.connect()
     db.ensure_default_user(conn)
     conn.close()
+    if settings.AUTH_MODE == "multi" and not settings.SECRET_KEY:
+        print("[⚠ 安全提醒] multi 模式未配置 SECRET_KEY：用户 API Key 将明文存库，"
+              "强烈建议在 .env 中设置", flush=True)
     _stop_event.clear()
     t = threading.Thread(target=_scheduler_loop, daemon=True)
     t.start()

@@ -13,6 +13,7 @@
 """
 import json
 import re
+import threading
 import time
 
 from app.config import settings
@@ -21,6 +22,8 @@ from app.core import db as cdb
 
 # 接入助手任务表（内存态，单 worker 单进程；server 重启即丢）
 AGENT_TASKS = {}
+# 保护 AGENT_TASKS 的复合操作 / 迭代（单 key 读写本身原子，迭代和增删须加锁取快照）
+_TASKS_LOCK = threading.Lock()
 
 RECIPE_SPEC = """你是「监控源接入工程师」，唯一任务：分析给定网页，产出一份 JSON 抓取配方(recipe)，
 让程序能从该页提取文章列表（标题+链接+日期）。只处理本任务，拒绝任何无关请求。

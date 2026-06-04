@@ -12,7 +12,7 @@ from fastapi import APIRouter, Body, Depends
 from fastapi.responses import JSONResponse
 
 from app import agent_tasks
-from app.agent_tasks import AGENT_TASKS, _alog, _agent_attempts, agent_available
+from app.agent_tasks import AGENT_TASKS, _TASKS_LOCK, _alog, _agent_attempts, agent_available
 from app.deps import current_user
 
 router = APIRouter()
@@ -36,12 +36,13 @@ def agent_crack(payload: dict = Body(...), user: dict = Depends(current_user)):
             if not url:
                 return JSONResponse(status_code=400, content={"error": "缺少 url"})
             tid = f"ac_{int(time.time()*1000)}"
-            AGENT_TASKS[tid] = {
-                "id": tid, "user_id": uid, "url": url, "state": "running",
-                "log": [], "hints": [], "history": [], "html": "",
-                "params": {k: payload.get(k) for k in ("title", "grp", "freq", "run_times", "backfill_days")},
-                "source": None, "preview": [],
-            }
+            with _TASKS_LOCK:
+                AGENT_TASKS[tid] = {
+                    "id": tid, "user_id": uid, "url": url, "state": "running",
+                    "log": [], "hints": [], "history": [], "html": "",
+                    "params": {k: payload.get(k) for k in ("title", "grp", "freq", "run_times", "backfill_days")},
+                    "source": None, "preview": [],
+                }
             _alog(tid, "sys", f"任务开始：{url}")
             if not payload.get("external"):  # external=外部工作者（如终端 Claude）接管，不起内置线程
                 threading.Thread(target=_agent_attempts, args=(tid,), daemon=True).start()
@@ -59,7 +60,9 @@ def agent_crack(payload: dict = Body(...), user: dict = Depends(current_user)):
             return {"ok": True}
         elif action == "latest":
             # 页面启动时自动接上本人最近的活跃任务（服务重启/刷新后续命）
-            live = [t for t in AGENT_TASKS.values()
+            with _TASKS_LOCK:
+                snapshot = list(AGENT_TASKS.values())
+            live = [t for t in snapshot
                     if t.get("user_id") == uid and t["state"] in ("running", "waiting")]
             live.sort(key=lambda t: t["id"], reverse=True)
             if live:

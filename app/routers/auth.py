@@ -25,7 +25,7 @@ _MAX_AGE = _TTL_DAYS * 86400
 
 def _set_cookie(resp: JSONResponse, token: str):
     resp.set_cookie(_COOKIE, token, max_age=_MAX_AGE, httponly=True,
-                    samesite="lax", path="/")
+                    samesite="lax", path="/", secure=settings.COOKIE_SECURE)
 
 
 @router.post("/auth/register")

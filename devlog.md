@@ -36,3 +36,17 @@
 - 【测试】最小 pytest 套件 38 绿（db 多租户隔离 27 + auth/加密 11），conftest 拦截 DB_FILE 保证不碰真实库
 - 【文档】CLAUDE.md/AGENTS.md 重写为新架构交接文档；旧版描述的 8 颗钉子全部解除
 - 【里程碑】进入最终自检验收：独立 verifier 跑验收矩阵 + code-reviewer 独立审查
+
+## 2026-06-04（终审修复）
+- 【修复·C1】index.html sendBeacon 关页上报已读改用 `Blob(...,{type:'application/json'})`——原 text/plain 被 FastAPI 拒收 422（已复现），最后一批已读不再静默丢失。
+- 【修复·H1】db.py `feed_set_star/feed_set_fulltext/feed_pin` 增 user_id 必选参 + UPDATE `AND user_id=?` 越权防线；同步 feed.py 调用点与取消星 DELETE；补 3 条越权不生效测试。
+- 【修复·H2】API Key 加密升级 enc2 格式：每条 `os.urandom(16)` 随机 salt，keystream=HMAC(SECRET_KEY, salt+counter)，存 `enc2$<salt_hex>$<b64>`；dec 兼容 enc2/enc1（旧固定流）/无前缀明文。杜绝同密钥同流复用。
+- 【修复·H3】claude_cli.py 删除硬编码 `/Users/edy/.local/bin/claude` 兜底，只留 cfg["cli_path"]→which("claude") 两级。
+- 【修复·H4/L5】feed.py/sources.py 改 `conn=Depends(get_db)`，去掉每请求 connect+init_db（迁移检查浪费），连接关闭由 get_db 的 finally 保证。
+- 【修复·M1/M7/L2】shared.js esc() 补单引号转义；index.html kind 标签 + 时间 chip 补 esc()。
+- 【修复·M3】agent_tasks 加 `_TASKS_LOCK`；agent.py 任务创建加锁、latest 改 `list(...)` 加锁快照迭代。
+- 【修复·M4】main.py lifespan：multi 模式未配 SECRET_KEY 时打印安全告警（flush）。
+- 【修复·M5】db.py fulltext_path 校验 fid 仅含 `[A-Za-z0-9_]`，挡路径穿越。
+- 【修复·M6】COOKIE_SECURE 可配（config + .env.example），set_cookie 加 secure。
+- 【收尾】run.py setdefault PYTHONUNBUFFERED；调度循环 print 加 flush；db._migrate_source_unique f-string 处注释「collist 来自 PRAGMA，无注入面」。
+- 【测试】pytest 43 绿（新增 enc2 随机性/enc1 兼容/feed 三函数越权防线）；`from app import main` 通过；8777 实测 list 正常、text/plain→422、json→200、enc2 往返成功；app/ web/ 无 `/Users/edy`。

@@ -17,6 +17,7 @@
   打星三档 1/2/3 = 使用意图；无星不持久（24h GC 清）；打星即抓全文，取消即删。
 """
 import os
+import re
 import sqlite3
 import time
 
@@ -180,6 +181,7 @@ def _migrate_source_unique(conn):
         except sqlite3.OperationalError:
             pass
         cols.append("user_id")
+    # collist 来自 PRAGMA table_info（库内已有列名），无用户输入，无注入面
     collist = ",".join(cols)
     try:
         conn.execute(
@@ -352,23 +354,25 @@ def feed_get(conn, fid, user_id=None):
     return d
 
 
-def feed_set_star(conn, fid, star):
-    conn.execute("UPDATE feed SET star=? WHERE id=?", (int(star), fid))
+def feed_set_star(conn, fid, star, user_id):
+    conn.execute("UPDATE feed SET star=? WHERE id=? AND user_id=?", (int(star), fid, user_id))
     conn.commit()
 
 
-def feed_set_fulltext(conn, fid, has):
-    conn.execute("UPDATE feed SET fulltext=? WHERE id=?", (1 if has else 0, fid))
+def feed_set_fulltext(conn, fid, has, user_id):
+    conn.execute("UPDATE feed SET fulltext=? WHERE id=? AND user_id=?", (1 if has else 0, fid, user_id))
     conn.commit()
 
 
-def feed_pin(conn, fid, workflow):
-    conn.execute("UPDATE feed SET pinned_to=? WHERE id=?", (workflow or "", fid))
+def feed_pin(conn, fid, workflow, user_id):
+    conn.execute("UPDATE feed SET pinned_to=? WHERE id=? AND user_id=?", (workflow or "", fid, user_id))
     conn.commit()
 
 
 # ── 全文落盘 ─────────────────────────────────────────────────────
 def fulltext_path(fid):
+    if not re.fullmatch(r'[A-Za-z0-9_]+', fid):
+        raise ValueError("非法 feed id")
     return os.path.join(FULLTEXT_DIR, f"{fid}.json")
 
 

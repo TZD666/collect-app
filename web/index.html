@@ -241,7 +241,7 @@ let curFilter='all', sources=[], knownIds=new Set();
 // ── 监控源 ──
 function freqChanged(){ document.getElementById('timesWrap').classList.toggle('hidden',document.getElementById('addFreq').value!=='daily'); }
 let timesList=['08:00'];
-function renderTimes(){ document.getElementById('timeChips').innerHTML=timesList.map((t,i)=>`<span class="tchip">${t} <button onclick="rmTime(${i})">✕</button></span>`).join(''); }
+function renderTimes(){ document.getElementById('timeChips').innerHTML=timesList.map((t,i)=>`<span class="tchip">${esc(t)} <button onclick="rmTime(${i})">✕</button></span>`).join(''); }
 function showTimePick(){ document.getElementById('timePickRow').classList.remove('hidden'); document.getElementById('timeAddBtn').classList.add('hidden'); }
 function hideTimePick(){ document.getElementById('timePickRow').classList.add('hidden'); document.getElementById('timeAddBtn').classList.remove('hidden'); }
 function confirmTime(){ const v=document.getElementById('timeInput').value; if(v&&!timesList.includes(v)){ timesList.push(v); timesList.sort(); renderTimes(); } hideTimePick(); }
@@ -263,7 +263,7 @@ async function loadSources(){
     </div>
     <div class="si-url">${esc(s.url)}</div>
     <div class="si-meta">
-      <span class="grp-tag" style="background:var(--chip);color:var(--ink2)">${(s.kind||'html').toUpperCase()}</span>
+      <span class="grp-tag" style="background:var(--chip);color:var(--ink2)">${esc((s.kind||'html').toUpperCase())}</span>
       <span>${s.freq==='hourly'?'每小时':'每天 '+esc(s.run_times||'08:00')}</span>
       <span style="flex:1"></span>
       <button class="mini btn-ghost" onclick="toggleSrc('${s.id}',${s.enabled?0:1})">${s.enabled?'暂停':'启用'}</button>
@@ -488,7 +488,7 @@ async function flushRead(){
   const ids=[...readQueue]; readQueue.clear();
   try{ await api('/feed',{action:'read',ids}); }catch(e){ ids.forEach(i=>readQueue.add(i)); }
 }
-window.addEventListener('beforeunload',()=>{ if(readQueue.size) navigator.sendBeacon&&navigator.sendBeacon('/api/feed',JSON.stringify({action:'read',ids:[...readQueue]})); });
+window.addEventListener('beforeunload',()=>{ if(readQueue.size) navigator.sendBeacon&&navigator.sendBeacon('/api/feed',new Blob([JSON.stringify({action:'read',ids:[...readQueue]})],{type:'application/json'})); });
 
 // ── 每 3 秒静默同步：上报已读 → 拉最新 → 有变化才重绘（滚动保留、不打断打星抓全文）──
 setInterval(async()=>{

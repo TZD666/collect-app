@@ -118,11 +118,31 @@ class TestLogin:
 
 class TestEncDec:
     def test_往返_有密钥(self, monkeypatch):
-        """SECRET_KEY 非空时 enc→dec 往返正确。"""
+        """SECRET_KEY 非空时 enc→dec 往返正确（新 enc2 随机 salt 格式）。"""
         monkeypatch.setattr(settings, "SECRET_KEY", "testsecret123")
         enc = service.enc_secret("my_api_key")
-        assert enc.startswith("enc1$")
+        assert enc.startswith("enc2$")
         assert service.dec_secret(enc) == "my_api_key"
+
+    def test_同明文两次加密密文不同(self, monkeypatch):
+        """随机 salt：同一明文两次 enc 密文不同（防同流复用）；各自都能解回。"""
+        monkeypatch.setattr(settings, "SECRET_KEY", "testsecret123")
+        e1 = service.enc_secret("same_key")
+        e2 = service.enc_secret("same_key")
+        assert e1 != e2
+        assert service.dec_secret(e1) == "same_key"
+        assert service.dec_secret(e2) == "same_key"
+
+    def test_enc1旧格式兼容解密(self, monkeypatch):
+        """旧 "enc1$<b64>"（固定 keystream 无 salt）仍能正确解密。"""
+        monkeypatch.setattr(settings, "SECRET_KEY", "testsecret123")
+        # 手工按旧 enc1 逻辑造密文：固定 keystream（salt=b''）XOR 明文
+        import base64
+        plain = "legacy_key".encode("utf-8")
+        ks = service._keystream(len(plain))  # salt 缺省 b'' = 旧固定流
+        xored = bytes(a ^ b for a, b in zip(plain, ks))
+        old_cipher = "enc1$" + base64.b64encode(xored).decode("ascii")
+        assert service.dec_secret(old_cipher) == "legacy_key"
 
     def test_空明文返回空(self, monkeypatch):
         """enc_secret('') 返回 ''，dec_secret('') 返回 ''。"""

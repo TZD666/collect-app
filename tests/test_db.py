@@ -89,6 +89,33 @@ class TestFeedIsolation:
         assert db.feed_get(conn, fid, user_id="u_a") is not None
         assert db.feed_get(conn, fid, user_id="u_b") is None
 
+    def test_feed_set_star_不越权(self, conn):
+        """feed_set_star 带错的 user_id（B 改 A 的 feed）不生效（AND user_id=? 防线）。"""
+        src_a = _add_src(conn, "u_a")
+        fid = _add_feed(conn, "u_a", src_a["id"])
+        db.feed_set_star(conn, fid, 3, "u_b")  # B 越权改 A 的 → 无效
+        assert db.feed_get(conn, fid)["star"] == 0
+        db.feed_set_star(conn, fid, 3, "u_a")  # 本人改 → 生效
+        assert db.feed_get(conn, fid)["star"] == 3
+
+    def test_feed_set_fulltext_不越权(self, conn):
+        """feed_set_fulltext 带错的 user_id 不生效。"""
+        src_a = _add_src(conn, "u_a")
+        fid = _add_feed(conn, "u_a", src_a["id"])
+        db.feed_set_fulltext(conn, fid, True, "u_b")  # 越权
+        assert db.feed_get(conn, fid)["fulltext"] == 0
+        db.feed_set_fulltext(conn, fid, True, "u_a")  # 本人
+        assert db.feed_get(conn, fid)["fulltext"] == 1
+
+    def test_feed_pin_不越权(self, conn):
+        """feed_pin 带错的 user_id 不生效。"""
+        src_a = _add_src(conn, "u_a")
+        fid = _add_feed(conn, "u_a", src_a["id"])
+        db.feed_pin(conn, fid, "wf1", "u_b")  # 越权
+        assert db.feed_get(conn, fid)["pinned_to"] == ""
+        db.feed_pin(conn, fid, "wf1", "u_a")  # 本人
+        assert db.feed_get(conn, fid)["pinned_to"] == "wf1"
+
     def test_stats_按用户统计(self, conn):
         """stats 只统计目标用户的数据，不混入他人。"""
         src_a = _add_src(conn, "u_a", url="http://a.com/rss")
@@ -124,7 +151,7 @@ class TestGC:
         """gc 不应删除有星的 feed。"""
         src_a = _add_src(conn, "u_a")
         fid = _add_feed(conn, "u_a", src_a["id"], url="http://a.com/1")
-        db.feed_set_star(conn, fid, 2)  # 打星
+        db.feed_set_star(conn, fid, 2, "u_a")  # 打星
 
         deleted = db.gc(conn, user_id="u_a", keep_unstarred_hours=0)
         assert deleted == 0
@@ -140,7 +167,7 @@ class TestGC:
         # 标记已读 fid_read
         db.feed_mark_read(conn, [fid_read], "u_a")
         # fid_starred 打星（未读）
-        db.feed_set_star(conn, fid_starred, 1)
+        db.feed_set_star(conn, fid_starred, 1, "u_a")
 
         deleted = db.gc_read(conn, user_id="u_a")
         assert deleted == 1  # 只清了 fid_read

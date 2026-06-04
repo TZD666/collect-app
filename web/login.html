@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>笔记台 · 登录</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --panel:#ffffff; --line:#e6e7ee; --line2:#eef0f5;
+    --ink:#1f1f29; --ink2:#5f6168; --ink3:#9498a3;
+    --accent:#4f5bd5; --accent-soft:#eef0ff;
+    --chip:#f1f2f6; --dark:#1f1f29;
+    --ok:#2e9e6b; --warn:#c98a14; --danger:#d2463c;
+    --radius:14px; --shadow:0 1px 3px rgba(20,20,40,.06),0 4px 16px rgba(20,20,40,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:14px/1.6 -apple-system,'PingFang SC','Helvetica Neue',sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;display:flex;align-items:center;justify-content:center}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:36px 40px;width:100%;max-width:380px}
+  .logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;margin-bottom:28px;justify-content:center}
+  .logo .dot{width:28px;height:28px;border-radius:50%;background:conic-gradient(from 180deg,#4f5bd5,#8a6cf0,#d56ba8,#4f5bd5);flex:none}
+
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:6px;font-weight:500}
+  .field input{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 13px;font:inherit;font-size:14px;outline:none;background:#fff;transition:.15s}
+  .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,91,213,.08)}
+
+  .btns{display:flex;gap:10px;margin-top:20px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;border-radius:20px;font-size:13.5px;font-weight:500;transition:.15s;flex:1}
+  .btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{filter:brightness(1.07)}
+  .btn-line{border:1px solid var(--line);color:var(--ink2)}.btn-line:hover{background:var(--chip)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .err{font-size:12.5px;color:var(--danger);background:#fdf0f0;border:1px solid #f5c6c6;border-radius:9px;padding:9px 13px;margin-top:14px;display:none}
+  .err.show{display:block}
+
+  .footer{text-align:center;font-size:11.5px;color:var(--ink3);margin-top:20px}
+
+  .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;z-index:80;opacity:0;transition:.25s}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo"><span class="dot"></span><span>笔记台 · 收集</span></div>
+
+  <div class="field">
+    <label>用户名</label>
+    <input type="text" id="username" placeholder="输入用户名" autocomplete="username" autofocus>
+  </div>
+  <div class="field">
+    <label>密码</label>
+    <input type="password" id="password" placeholder="输入密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+  </div>
+
+  <div class="err" id="errBox"></div>
+
+  <div class="btns">
+    <button class="btn btn-line" id="regBtn" onclick="register()">注册</button>
+    <button class="btn btn-accent" id="loginBtn" onclick="login()">登录</button>
+  </div>
+
+  <div class="footer">本地单机工具 · 数据存在本机</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// login 页不引用 shared.js，避免 401 跳转死循环
+// 直接封装一个不跳转的简化 fetch
+async function callApi(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json();
+  return { ok: r.ok && j.ok !== false && !j.error, data: j };
+}
+
+function showErr(msg) {
+  const el = document.getElementById('errBox');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function hideErr() { document.getElementById('errBox').classList.remove('show'); }
+
+function getFields() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  return { username, password };
+}
+
+function setBusy(busy) {
+  document.getElementById('loginBtn').disabled = busy;
+  document.getElementById('regBtn').disabled = busy;
+}
+
+async function login() {
+  hideErr();
+  const { username, password } = getFields();
+  if (!username || !password) { showErr('请填写用户名和密码'); return; }
+  setBusy(true);
+  try {
+    const { ok, data } = await callApi('/api/auth/login', { username, password });
+    if (ok) {
+      location.href = '/';
+    } else {
+      showErr(data.error || '登录失败，请检查用户名和密码');
+    }
+  } catch (e) {
+    showErr('服务未连接，请先启动 run.py');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function register() {
+  hideErr();
+  const { username, password } = getFields();
+  if (!username || !password) { showErr('请填写用户名和密码'); return; }
+  if (password.length < 6) { showErr('密码至少 6 位'); return; }
+  setBusy(true);
+  try {
+    const { ok, data } = await callApi('/api/auth/register', { username, password });
+    if (ok) {
+      location.href = '/';
+    } else {
+      showErr(data.error || '注册失败，该用户名可能已存在');
+    }
+  } catch (e) {
+    showErr('服务未连接，请先启动 run.py');
+  } finally {
+    setBusy(false);
+  }
+}
+</script>
+</body>
+</html>

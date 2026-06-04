@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""FastAPI 应用入口 — 收集App。
+
+职责：
+  · lifespan：启动 init_db + 建数据/全文目录 + 起后台调度线程；退出优雅停线程。
+  · 注册路由（统一前缀 /api）。
+  · GET /api/info 探活。
+  · 同源静态托管 web/（单文件全中文前端）。
+
+调度线程迁自 server.py 的 _collect_scheduler：每轮 crawler.run() 增量抓取，
+每晚 2:00 清「已读且无星」（幂等一天一次），用 threading.Event().wait(60)
+替代 sleep——退出时 stop.set() 可即时唤醒优雅退出。
+"""
+import os
+import threading
+import time
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+from app.config import settings
+from app.core import db
+from app.routers import sources, feed, agent
+
+# 调度线程停止信号（lifespan 退出时 set）
+_stop_event = threading.Event()
+
+
+def _scheduler_loop():
+    """后台调度：每 60s 增量抓取一轮 + 每晚 2:00 清已读无星（幂等）。
+    异常打印中文继续，不让单次失败拖垮整个调度。"""
+    from app.core import crawler
+    while not _stop_event.is_set():
+        try:
+            crawler.run()
+        except Exception as e:
+            print(f"[收集调度] 抓取异常：{e}")
+        try:
+            conn = db.connect()
+            db.init_db(conn)
+            today = time.strftime("%Y-%m-%d")
+            if time.localtime().tm_hour == 2 and db.meta_get(conn, "last_read_clean") != today:
+                n = db.gc_read(conn)
+                db.meta_set(conn, "last_read_clean", today)
+                print(f"[收集调度] 2:00 已读清理：{n} 条")
+            conn.close()
+        except Exception as e:
+            print(f"[收集调度] 清理异常：{e}")
+        _stop_event.wait(60)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动：建目录 + 初始化库 + 起调度
+    os.makedirs(settings.DATA_DIR, exist_ok=True)
+    os.makedirs(settings.FULLTEXT_DIR, exist_ok=True)
+    db.init_db()
+    _stop_event.clear()
+    t = threading.Thread(target=_scheduler_loop, daemon=True)
+    t.start()
+    print(f"✓ 收集App 已启动 → http://{settings.HOST}:{settings.PORT}")
+    print(f"  身份模式：{settings.AUTH_MODE}　AI 通道：{settings.DEFAULT_AI_CHANNEL}")
+    print("  收集调度：每 60s 增量抓取 · 每晚 2:00 清理已读无星")
+    try:
+        yield
+    finally:
+        # 退出：唤醒并停止调度线程
+        _stop_event.set()
+
+
+app = FastAPI(title="收集App", lifespan=lifespan)
+
+# 业务路由（统一 /api 前缀）
+app.include_router(sources.router, prefix="/api")
+app.include_router(feed.router, prefix="/api")
+app.include_router(agent.router, prefix="/api")
+
+
+@app.get("/api/info")
+def info():
+    """服务探活：是否有可用 AI 通道、身份模式。"""
+    from app.agent_tasks import agent_available
+    return {"ok": True, "cli_mode": agent_available(),
+            "app": "收集App", "auth_mode": settings.AUTH_MODE}
+
+
+# 同源静态托管 web/（前端单文件）。web/ 此刻可能尚未建好——先建空目录防 mount 崩。
+os.makedirs(settings.WEB_DIR, exist_ok=True)
+app.mount("/", StaticFiles(directory=settings.WEB_DIR, html=True), name="web")

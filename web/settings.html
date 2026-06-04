@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>笔记台 · 设置</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --panel:#ffffff; --line:#e6e7ee; --line2:#eef0f5;
+    --ink:#1f1f29; --ink2:#5f6168; --ink3:#9498a3;
+    --accent:#4f5bd5; --accent-soft:#eef0ff;
+    --chip:#f1f2f6; --dark:#1f1f29;
+    --ok:#2e9e6b; --warn:#c98a14; --danger:#d2463c;
+    --radius:14px; --shadow:0 1px 3px rgba(20,20,40,.06),0 4px 16px rgba(20,20,40,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:14px/1.6 -apple-system,'PingFang SC','Helvetica Neue',sans-serif;color:var(--ink);background:var(--bg);min-height:100vh}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  .hidden{display:none!important}
+
+  .topbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .logo{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:600}
+  .logo .dot{width:24px;height:24px;border-radius:50%;background:conic-gradient(from 180deg,#4f5bd5,#8a6cf0,#d56ba8,#4f5bd5)}
+  .topbar .spacer{flex:1}
+  .back{font-size:18px;color:var(--ink2);padding:4px 10px;border-radius:8px}
+  .back:hover{background:var(--chip)}
+
+  .main{padding:32px 36px 60px;max-width:600px;margin:0 auto}
+
+  .sec-title{font-size:16px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 28px;margin-bottom:20px}
+
+  .field{margin-bottom:18px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:7px;font-weight:500}
+  .field input,.field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 13px;font:inherit;font-size:14px;outline:none;background:#fff;transition:.15s}
+  .field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,91,213,.08)}
+  .field .hint{font-size:11.5px;color:var(--ink3);margin-top:5px}
+
+  /* 通道单选 */
+  .channel-opts{display:flex;gap:10px;flex-wrap:wrap}
+  .ch-opt{flex:1;min-width:120px}
+  .ch-opt input[type=radio]{display:none}
+  .ch-opt label{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 10px;border:2px solid var(--line);border-radius:11px;cursor:pointer;transition:.15s;text-align:center;font-size:13px;font-weight:500}
+  .ch-opt label .sub{font-size:11px;color:var(--ink3);font-weight:400}
+  .ch-opt input:checked+label{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  .ch-opt input:checked+label .sub{color:var(--accent)}
+  .ch-opt label:hover{border-color:var(--accent);background:var(--accent-soft)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:20px;font-size:13.5px;font-weight:500;transition:.15s}
+  .btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{filter:brightness(1.07)}
+  .btn-line{border:1px solid var(--line);color:var(--ink2)}.btn-line:hover{background:var(--chip)}
+  .btn-ghost{color:var(--ink2)}.btn-ghost:hover{background:var(--chip)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+
+  .ping-result{font-size:13px;padding:10px 14px;border-radius:9px;margin-top:14px;display:none}
+  .ping-result.ok{background:#eaf7f0;color:var(--ok);border:1px solid #b9e6cd;display:block}
+  .ping-result.err{background:#fdf0f0;color:var(--danger);border:1px solid #f5c6c6;display:block}
+
+  .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;z-index:80;opacity:0;transition:.25s}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="back" onclick="location.href='/'">←</button>
+  <div class="logo"><span class="dot"></span><span>笔记台 · 设置</span></div>
+  <div class="spacer"></div>
+</div>
+
+<div class="main">
+  <div class="sec-title">⚙ AI 模型配置</div>
+  <div class="card">
+    <!-- 通道选择 -->
+    <div class="field">
+      <label>AI 通道</label>
+      <div class="channel-opts">
+        <div class="ch-opt">
+          <input type="radio" name="channel" id="ch-anthropic" value="anthropic" onchange="onChannelChange()">
+          <label for="ch-anthropic">Anthropic 官方<span class="sub">Claude 系列</span></label>
+        </div>
+        <div class="ch-opt">
+          <input type="radio" name="channel" id="ch-openai" value="openai" onchange="onChannelChange()">
+          <label for="ch-openai">OpenAI 兼容接口<span class="sub">DeepSeek · Kimi · Ollama</span></label>
+        </div>
+        <div class="ch-opt">
+          <input type="radio" name="channel" id="ch-cli" value="cli" onchange="onChannelChange()">
+          <label for="ch-cli">本机 claude CLI<span class="sub">复用 Claude Code</span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Base URL（仅 openai 通道显示）-->
+    <div class="field" id="fieldBaseUrl">
+      <label>Base URL</label>
+      <input type="url" id="baseUrl" placeholder="https://api.deepseek.com/v1">
+      <div class="hint">OpenAI 兼容接口的基础地址（含 /v1）</div>
+    </div>
+
+    <!-- API Key -->
+    <div class="field" id="fieldApiKey">
+      <label>API Key</label>
+      <input type="password" id="apiKey" placeholder="留空则不修改已保存的 Key" autocomplete="off">
+      <div class="hint">留空表示不覆盖已保存的 Key；cli 通道无需填写</div>
+    </div>
+
+    <!-- 模型名 -->
+    <div class="field" id="fieldModel">
+      <label>模型名</label>
+      <input type="text" id="modelName" placeholder="claude-3-5-sonnet-20241022">
+      <div class="hint">cli 通道留空使用默认模型</div>
+    </div>
+
+    <div id="pingResult" class="ping-result"></div>
+
+    <div class="btns">
+      <button class="btn btn-ghost" onclick="location.href='/'">← 返回</button>
+      <button class="btn btn-line" id="pingBtn" onclick="pingTest()">测试连接</button>
+      <button class="btn btn-accent" id="saveBtn" onclick="saveConfig()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/shared.js"></script>
+<script>
+function onChannelChange() {
+  const ch = getChannel();
+  // openai 通道才显示 Base URL
+  document.getElementById('fieldBaseUrl').classList.toggle('hidden', ch !== 'openai');
+  // cli 通道隐藏 API Key
+  document.getElementById('fieldApiKey').classList.toggle('hidden', ch === 'cli');
+}
+
+function getChannel() {
+  const el = document.querySelector('input[name="channel"]:checked');
+  return el ? el.value : 'anthropic';
+}
+
+function getFormConfig() {
+  return {
+    channel: getChannel(),
+    base_url: document.getElementById('baseUrl').value.trim(),
+    api_key: document.getElementById('apiKey').value,   // 空字符串 = 不修改
+    model: document.getElementById('modelName').value.trim()
+  };
+}
+
+function fillForm(cfg) {
+  // 设置通道
+  const ch = cfg.channel || 'anthropic';
+  const radio = document.getElementById('ch-' + ch);
+  if (radio) radio.checked = true;
+  onChannelChange();
+
+  document.getElementById('baseUrl').value = cfg.base_url || '';
+  // api_key 后端返回掩码（如 sk-***）时输入框留空，用 placeholder 显示掩码
+  if (cfg.api_key_mask) {
+    document.getElementById('apiKey').value = '';
+    document.getElementById('apiKey').placeholder = cfg.api_key_mask + '（留空不修改）';
+  } else {
+    document.getElementById('apiKey').value = '';
+  }
+  document.getElementById('modelName').value = cfg.model || '';
+}
+
+async function loadConfig() {
+  try {
+    const j = await api('/auth/ai-config', { action: 'get' });
+    if (j.config) fillForm(j.config);
+  } catch (e) {
+    // 未登录会跳 login，其他错误静默（配置页可以是空表单）
+  }
+}
+
+async function saveConfig() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = '保存中…';
+  hidePing();
+  try {
+    await api('/auth/ai-config', { action: 'save', config: getFormConfig() });
+    toast('配置已保存');
+    // 重新加载以刷新掩码
+    await loadConfig();
+  } catch (e) {
+    toast('保存失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+
+async function pingTest() {
+  const btn = document.getElementById('pingBtn');
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = '测试中…';
+  hidePing();
+  try {
+    const j = await api('/assistant/ping', { config: getFormConfig() });
+    showPing(true, '✓ 连接成功' + (j.reply ? '：' + j.reply : ''));
+  } catch (e) {
+    showPing(false, '连接失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+
+function showPing(ok, msg) {
+  const el = document.getElementById('pingResult');
+  el.textContent = msg;
+  el.className = 'ping-result ' + (ok ? 'ok' : 'err');
+}
+function hidePing() {
+  document.getElementById('pingResult').className = 'ping-result';
+}
+
+// 初始化：加载已保存配置
+loadConfig();
+</script>
+</body>
+</html>

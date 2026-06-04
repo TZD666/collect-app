@@ -1,11 +1,23 @@
-# 用户个人数据 —— 不入库
+# ── 配置（含密钥）──
+.env
+
+# ── 虚拟环境 ──
+.venv/
+
+# ── 用户个人数据 —— 不入库（保留占位 .gitkeep）──
+data/
+fulltext/
+!data/.gitkeep
+!fulltext/.gitkeep
+# 旧 demo 数据（迁移后保留，最后统一清理）
 收集/data/
 收集/fulltext/
 
-# 运行时
+# ── 运行时 ──
 __pycache__/
 *.pyc
 *.log
 
-# macOS
+# ── 工具 / 系统 ──
+.omc/
 .DS_Store

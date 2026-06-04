@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>笔记台 · 收集</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --panel:#ffffff; --line:#e6e7ee; --line2:#eef0f5;
+    --ink:#1f1f29; --ink2:#5f6168; --ink3:#9498a3;
+    --accent:#4f5bd5; --accent-soft:#eef0ff;
+    --chip:#f1f2f6; --dark:#1f1f29; --src:#eaf1ff;
+    --ok:#2e9e6b; --warn:#c98a14; --danger:#d2463c;
+    --star:#e8a317;
+    --radius:14px; --shadow:0 1px 3px rgba(20,20,40,.06),0 4px 16px rgba(20,20,40,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:14px/1.6 -apple-system,'PingFang SC','Helvetica Neue',sans-serif;color:var(--ink);background:var(--bg);height:100vh;overflow:hidden}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  .hidden{display:none!important}
+  .topbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .logo{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:600}
+  .logo .dot{width:24px;height:24px;border-radius:50%;background:conic-gradient(from 180deg,#4f5bd5,#8a6cf0,#d56ba8,#4f5bd5)}
+  .topbar .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:20px;font-size:13px;font-weight:500;transition:.15s}
+  .btn-dark{background:var(--dark);color:#fff}.btn-dark:hover{background:#33333f}
+  .btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{filter:brightness(1.07)}
+  .btn-line{border:1px solid var(--line);color:var(--ink2)}.btn-line:hover{background:var(--chip)}
+  .btn-ghost{color:var(--ink2)}.btn-ghost:hover{background:var(--chip)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .cols{height:calc(100vh - 56px);display:flex;overflow:hidden}
+  .col-src{flex:0 0 320px;background:var(--src);border-right:1px solid var(--line);display:flex;flex-direction:column}
+  .col-feed{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .col-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;font-size:14px;font-weight:600}
+  .col-head .sub{font-size:12px;color:var(--ink2);font-weight:400}
+  .col-body{flex:1;overflow-y:auto;padding:0 14px 18px}
+  .col-feed .col-body{padding-bottom:76px} /* 给底部确认条让位 */
+
+  /* 源面板 */
+  .src-add{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+  .src-add input,.src-add select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;outline:none;margin-bottom:7px;background:#fff}
+  .src-add input:focus{border-color:var(--accent)}
+  .src-add .row{display:flex;gap:7px}.src-add .row>*{flex:1;margin-bottom:7px}
+  .hint{font-size:11px;color:var(--ink3);margin:-3px 0 7px 2px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
+  .tchip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 9px;border-radius:12px;background:var(--accent-soft);color:var(--accent)}
+  .tchip button{color:var(--accent);font-size:11px;padding:0 2px}
+  .tchip button:hover{color:var(--danger)}
+  .src-item{background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:10px 11px;margin-bottom:8px}
+  .src-item .si-top{display:flex;align-items:center;gap:7px}
+  .src-item .si-title{flex:1;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .src-item .si-url{font-size:11px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px}
+  .src-item .si-meta{font-size:11px;color:var(--ink2);margin-top:4px;display:flex;gap:8px;align-items:center}
+  .grp-tag{font-size:11px;padding:1px 7px;border-radius:9px;background:var(--accent-soft);color:var(--accent)}
+  .dot-on{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block}
+  .dot-off{width:7px;height:7px;border-radius:50%;background:var(--ink3);display:inline-block}
+  .mini{font-size:11px;padding:3px 8px;border-radius:8px}
+  /* 下次抓取：进度条（每小时）+ 时段灯（每天） */
+  .nextrun{margin-top:7px;font-size:11px;color:var(--ink2)}
+  .pbar{height:4px;background:var(--line2);border-radius:2px;margin-top:4px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--accent);border-radius:2px;transition:width 1s linear}
+  .pbar.due i{background:var(--warn)}
+  .slot{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:8px;margin-right:4px;border:1px solid var(--line)}
+  .slot.done{background:#eaf7f0;border-color:#b9e6cd;color:var(--ok)}
+  .slot.due{background:#fdf6e8;border-color:#ecd9a8;color:var(--warn)}
+  .slot.todo{color:var(--ink3)}
+  .read-tag{font-size:10.5px;padding:1px 7px;border-radius:8px;background:#eaf7f0;color:var(--ok);border:1px solid #b9e6cd;white-space:nowrap}
+
+  /* feed */
+  .feed-toolbar{display:flex;align-items:center;gap:8px;padding:0 18px 10px;flex-wrap:wrap}
+  .seg{display:flex;background:var(--chip);border-radius:18px;padding:3px}
+  .seg button{padding:5px 13px;border-radius:15px;font-size:12.5px;color:var(--ink2)}
+  .seg button.on{background:#fff;color:var(--ink);font-weight:500;box-shadow:var(--shadow)}
+  .sec-label{font-size:12px;font-weight:600;color:var(--ink2);margin:14px 4px 8px;display:flex;align-items:center;gap:7px}
+  .sec-label .n{font-size:11px;background:var(--accent-soft);color:var(--accent);padding:1px 8px;border-radius:9px}
+  .fcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-bottom:10px;box-shadow:var(--shadow);transition:opacity .3s}
+  .fcard.starred{border-color:#f0d49a;background:#fffdf7}
+  .fcard.read{opacity:.62}
+  .fcard.read.starred{opacity:1}
+  .unread-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;flex:none;margin-top:8px}
+  .fc-row{display:flex;gap:10px}
+  .fc-main{flex:1;min-width:0}
+  .fcard .fc-title{font-size:14.5px;font-weight:600;line-height:1.5}
+  .fcard .fc-title a{color:var(--ink);text-decoration:none}
+  .fcard .fc-title a:hover{color:var(--accent);text-decoration:underline}
+  .fcard .fc-meta{font-size:11.5px;color:var(--ink3);margin-top:5px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .fcard .fc-actions{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .stars{display:flex;gap:3px;align-items:center}
+  .star{font-size:19px;color:#d6d8e3;line-height:1;transition:.1s}
+  .star:hover{transform:scale(1.15)}
+  .star.lit{color:var(--star)}
+  .unstar{font-size:13px;color:var(--ink3);padding:2px 7px;border-radius:8px;border:1px solid var(--line)}
+  .unstar:hover{color:var(--danger);border-color:var(--danger)}
+  .star-label{font-size:11.5px;color:var(--ink2)}
+  .ft-badge{font-size:11px;color:var(--ok);display:flex;align-items:center;gap:3px}
+  .spinner{width:13px;height:13px;border:2px solid #d6d8e3;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .empty{text-align:center;color:var(--ink3);font-size:13px;padding:50px 20px;line-height:1.9}
+  .legend{font-size:11.5px;color:var(--ink2);background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:9px 12px;margin-bottom:4px;line-height:1.7}
+
+  /* 新资讯提示丸 */
+  .newpill{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:30;background:var(--accent);color:#fff;font-size:12.5px;padding:7px 16px;border-radius:18px;box-shadow:0 4px 14px rgba(79,91,213,.4);cursor:pointer}
+
+  /* 底部确认条 */
+  .confirmbar{position:absolute;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;gap:12px;z-index:20}
+  .confirmbar .cnt{font-size:13px;color:var(--ink2)}
+  .confirmbar .cnt b{color:var(--star)}
+
+  .toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;z-index:80;opacity:0;transition:.25s;max-width:80vw}
+  .toast.show{opacity:1}
+
+  /* 接入助手小窗（仅服务于「添加监控源」任务）*/
+  .agentwin{position:fixed;right:18px;bottom:74px;width:360px;height:400px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 40px rgba(20,20,40,.22);display:flex;flex-direction:column;z-index:70;overflow:hidden}
+  .aw-head{display:flex;align-items:center;gap:8px;padding:11px 14px;font-size:13.5px;font-weight:600;border-bottom:1px solid var(--line2);background:var(--accent-soft)}
+  .aw-state{font-size:11px;font-weight:400;color:var(--accent)}
+  .aw-head .x{font-size:16px;color:var(--ink3);padding:2px 7px;border-radius:7px}
+  .aw-head .x:hover{background:#fff}
+  .aw-log{flex:1;overflow-y:auto;padding:10px 12px;font-size:12.5px;line-height:1.7}
+  .aw-line{margin-bottom:8px;padding:7px 10px;border-radius:9px;background:var(--chip);color:var(--ink2)}
+  .aw-line.aw-agent{background:var(--accent-soft);color:var(--ink)}
+  .aw-line.aw-user{background:#fff8e8;color:var(--ink);border:1px solid #f0e0b0}
+  .aw-ts{font-size:10px;color:var(--ink3);margin-right:6px}
+  .aw-input{display:flex;gap:7px;padding:9px 11px;border-top:1px solid var(--line2)}
+  .aw-input input{flex:1;border:1px solid var(--line);border-radius:16px;padding:7px 13px;font:inherit;font-size:12.5px;outline:none}
+  .aw-input input:focus{border-color:var(--accent)}
+  .aw-input .send{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:14px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><span class="dot"></span><span>笔记台 · 收集</span></div>
+  <div class="spacer"></div>
+  <span style="font-size:12px;color:var(--ink3)" id="statLine"></span>
+  <button class="btn btn-ghost" onclick="location.href='/settings.html'">⚙ 设置</button>
+  <button class="btn btn-line" onclick="gc()">🧹 清理无星</button>
+  <button class="btn btn-line" onclick="runCrawl()" id="crawlBtn">⟳ 手动抓取</button>
+  <button class="btn btn-line" onclick="location.href='/starred.html'">★ 重点新闻</button>
+  <button class="btn btn-accent" onclick="location.href='/summary.html'">→ 总结页</button>
+</div>
+
+<div class="cols">
+  <!-- 监控源 -->
+  <div class="col col-src">
+    <div class="col-head">监控源 <span class="sub" id="srcCount"></span></div>
+    <div class="col-body">
+      <div class="src-add">
+        <div class="hint" style="margin:0 0 8px 2px">当前支持：<b>网页栏目/列表页（HTML）</b>· <b>政府部委站（jpaas）</b>· RSS · sitemap<br>公众号作者、微博、B站 UP 等平台 · <span style="color:var(--accent)">后续接入</span></div>
+        <input id="addUrl" placeholder="栏目列表页 / RSS / sitemap 地址">
+        <input id="addTitle" placeholder="名称（如 新华-数智）">
+        <div class="row">
+          <input id="addGrp" placeholder="分组（如 政策类）">
+          <select id="addFreq" onchange="freqChanged()"><option value="daily">每天</option><option value="hourly">每小时</option></select>
+        </div>
+        <div id="timesWrap">
+          <div id="timeChips" class="chips"></div>
+          <button class="btn btn-line" style="margin-bottom:7px" id="timeAddBtn" onclick="showTimePick()">＋ 加时段</button>
+          <div class="row hidden" id="timePickRow" style="align-items:center">
+            <input type="time" id="timeInput" value="08:00">
+            <button class="btn btn-dark" style="flex:none;margin-bottom:7px" onclick="confirmTime()">确认</button>
+            <button class="btn btn-ghost" style="flex:none;margin-bottom:7px" onclick="hideTimePick()">取消</button>
+          </div>
+          <div class="hint">每天在这些时刻各抓一次（点 ✕ 移除时段）</div>
+        </div>
+        <div class="hint" style="margin:2px 0 3px 2px">首抓回溯 <b id="bfVal" style="color:var(--accent)">7</b> 天（上限 14，仅首次抓取生效）</div>
+        <input type="range" id="bfDays" min="1" max="14" value="7" style="width:100%;margin-bottom:9px;accent-color:var(--accent)" oninput="document.getElementById('bfVal').textContent=this.value">
+        <button class="btn btn-dark" style="width:100%;justify-content:center" id="addBtn" onclick="addSource()">＋ 添加并试抓</button>
+      </div>
+      <div id="srcList"></div>
+    </div>
+  </div>
+
+  <!-- feed -->
+  <div class="col col-feed">
+    <div class="col-head">资讯流 <span class="sub" id="feedSub"></span></div>
+    <div class="feed-toolbar">
+      <div class="seg" id="starSeg">
+        <button class="on" data-f="all" onclick="setFilter('all')">全部</button>
+        <button data-f="starred" onclick="setFilter('starred')">已打星</button>
+      </div>
+      <select id="srcFilter" class="mini btn-line" style="border:1px solid var(--line)" onchange="loadFeed()">
+        <option value="">全部来源</option>
+      </select>
+    </div>
+    <div class="col-body" id="feedBody"></div>
+    <div class="confirmbar">
+      <span class="cnt" id="pickCnt">★ 已选 0 篇</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-accent" id="confirmBtn" onclick="location.href='/summary.html'">✓ 确认，进入总结 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- 接入助手小窗 -->
+<div class="agentwin hidden" id="agentWin">
+  <div class="aw-head">🤖 监控源接入助手 <span class="aw-state" id="awState"></span><span style="flex:1"></span><button class="x" onclick="closeAgent()">✕</button></div>
+  <div class="aw-log" id="awLog"></div>
+  <div class="aw-input">
+    <input id="awInput" placeholder="给它递线索：列表在哪个接口 / 哪一块…" onkeydown="if(event.key==='Enter')agentSay()">
+    <button class="send" onclick="agentSay()">↑</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/shared.js"></script>
+<script>
+const STAR_LABEL={1:'存着·以后可能用',2:'今天用·非重点',3:'爆点·核心选题'};
+let curFilter='all', sources=[], knownIds=new Set();
+
+// ── 监控源 ──
+function freqChanged(){ document.getElementById('timesWrap').classList.toggle('hidden',document.getElementById('addFreq').value!=='daily'); }
+let timesList=['08:00'];
+function renderTimes(){ document.getElementById('timeChips').innerHTML=timesList.map((t,i)=>`<span class="tchip">${t} <button onclick="rmTime(${i})">✕</button></span>`).join(''); }
+function showTimePick(){ document.getElementById('timePickRow').classList.remove('hidden'); document.getElementById('timeAddBtn').classList.add('hidden'); }
+function hideTimePick(){ document.getElementById('timePickRow').classList.add('hidden'); document.getElementById('timeAddBtn').classList.remove('hidden'); }
+function confirmTime(){ const v=document.getElementById('timeInput').value; if(v&&!timesList.includes(v)){ timesList.push(v); timesList.sort(); renderTimes(); } hideTimePick(); }
+function rmTime(i){ timesList.splice(i,1); renderTimes(); }
+async function loadSources(){
+  let j; try{ j=await api('/mon-source',{action:'list'}); }catch(e){ toast('服务未连接：'+e.message); return; }
+  sources=j.sources;
+  document.getElementById('srcCount').textContent=sources.length?`${sources.length} 个`:'';
+  document.getElementById('statLine').textContent=
+    `未读 ${j.stats.unread} · 打星 ${j.stats.starred}（爆点 ${j.stats.star3}）`;
+  updatePick(j.stats.starred);
+  const el=document.getElementById('srcList');
+  if(!sources.length){ el.innerHTML='<div class="empty" style="padding:30px 10px">还没有监控源。<br>上方添加一个栏目列表页或 RSS。</div>'; }
+  else el.innerHTML=sources.map(s=>`<div class="src-item">
+    <div class="si-top">
+      <span class="${s.enabled?'dot-on':'dot-off'}"></span>
+      <span class="si-title">${esc(s.title)}</span>
+      ${s.grp?`<span class="grp-tag">${esc(s.grp)}</span>`:''}
+    </div>
+    <div class="si-url">${esc(s.url)}</div>
+    <div class="si-meta">
+      <span class="grp-tag" style="background:var(--chip);color:var(--ink2)">${(s.kind||'html').toUpperCase()}</span>
+      <span>${s.freq==='hourly'?'每小时':'每天 '+esc(s.run_times||'08:00')}</span>
+      <span style="flex:1"></span>
+      <button class="mini btn-ghost" onclick="toggleSrc('${s.id}',${s.enabled?0:1})">${s.enabled?'暂停':'启用'}</button>
+      <button class="mini btn-ghost" style="color:var(--danger)" onclick="delSrc('${s.id}')">删除</button>
+    </div>
+    <div class="nextrun" id="nr_${s.id}"></div></div>`).join('');
+  renderNextRun();
+  const sf=document.getElementById('srcFilter'); const cur=sf.value;
+  sf.innerHTML='<option value="">全部来源</option>'+sources.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  sf.value=cur;
+}
+async function addSource(){
+  const url=document.getElementById('addUrl').value.trim();
+  if(!url){ toast('请输入地址'); return; }
+  const btn=document.getElementById('addBtn'); btn.disabled=true; const old=btn.textContent; btn.textContent='试抓中…';
+  try{
+    const j=await api('/mon-source',{action:'add',url,
+      title:document.getElementById('addTitle').value.trim()||url,
+      grp:document.getElementById('addGrp').value.trim(),
+      freq:document.getElementById('addFreq').value,
+      run_times:timesList.join(',')||'08:00',
+      backfill_days:+document.getElementById('bfDays').value});
+    toast(`已添加「${j.source.title}」，试抓到 ${j.count} 条`);
+    ['addUrl','addTitle','addGrp'].forEach(i=>document.getElementById(i).value='');
+    timesList=['08:00']; renderTimes();
+    loadSources();
+  }catch(e){
+    if(e.payload&&e.payload.agent_available){
+      toast('常规试抓失败 → 已唤起接入助手');
+      agentStart({url,
+        title:document.getElementById('addTitle').value.trim()||url,
+        grp:document.getElementById('addGrp').value.trim(),
+        freq:document.getElementById('addFreq').value,
+        run_times:timesList.join(',')||'08:00',
+        backfill_days:+document.getElementById('bfDays').value});
+    }else toast('添加失败：'+e.message);
+  }
+  btn.disabled=false; btn.textContent=old;
+}
+
+// ── 接入助手小窗（仅服务「添加监控源」任务）──
+let agentTask=null, agentTimer=null;
+function closeAgent(){ document.getElementById('agentWin').classList.add('hidden'); if(agentTimer){clearInterval(agentTimer);agentTimer=null;} agentTask=null; }
+async function agentStart(params){
+  document.getElementById('agentWin').classList.remove('hidden');
+  document.getElementById('awLog').innerHTML='';
+  document.getElementById('awState').textContent='启动中…';
+  try{
+    const j=await api('/agent-crack',{action:'start',...params});
+    agentTask=j.id;
+    if(agentTimer) clearInterval(agentTimer);
+    agentTimer=setInterval(agentPoll,2000); agentPoll();
+  }catch(e){ document.getElementById('awLog').innerHTML='<div class="aw-line">启动失败：'+esc(e.message)+'</div>'; }
+}
+async function agentPoll(){
+  if(!agentTask) return;
+  try{
+    const j=await api('/agent-crack',{action:'status',id:agentTask});
+    const el=document.getElementById('awLog');
+    const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<40;
+    el.innerHTML=j.log.map(l=>`<div class="aw-line aw-${l.who}"><span class="aw-ts">${l.ts}</span>${esc(l.text)}</div>`).join('');
+    if(atBottom) el.scrollTop=el.scrollHeight;
+    document.getElementById('awState').textContent=
+      j.state==='running'?'⏳ 工作中…':j.state==='waiting'?'💬 等你的线索':j.state==='success'?'✅ 已接入':'';
+    if(j.state==='success'){ clearInterval(agentTimer); agentTimer=null; loadSources(); }
+  }catch(e){}
+}
+async function agentSay(){
+  const inp=document.getElementById('awInput'); const v=inp.value.trim();
+  if(!v||!agentTask) return;
+  inp.value='';
+  try{ await api('/agent-crack',{action:'say',id:agentTask,text:v}); agentPoll(); }
+  catch(e){ toast(e.message); }
+}
+// ── 下次抓取可视化：每小时→进度条+倒计时；每天→时段灯（绿=已抓 黄=到点等调度 灰=待到点）──
+function parseTs(s){ if(!s) return null; const d=new Date(s.replace(' ','T')); return isNaN(d)?null:d; }
+function fmtHM(d){ return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function fmtMMSS(ms){ const s=Math.max(0,Math.floor(ms/1000));
+  if(s>=3600) return Math.floor(s/3600)+'小时'+Math.floor(s%3600/60)+'分';
+  return Math.floor(s/60)+'分'+String(s%60).padStart(2,'0')+'秒'; }
+function renderNextRun(){
+  const now=new Date();
+  for(const s of sources){
+    const el=document.getElementById('nr_'+s.id); if(!el) continue;
+    if(!s.enabled){ el.innerHTML='<span style="color:var(--ink3)">已暂停</span>'; continue; }
+    const last=parseTs(s.last_run);
+    if(s.freq==='hourly'){
+      if(!last){ el.innerHTML='待首抓 · 调度 1 分钟内启动<div class="pbar due"><i style="width:100%"></i></div>'; continue; }
+      const next=new Date(last.getTime()+3600e3);
+      const pct=Math.min(100,(now-last)/3600e3*100);
+      if(now>=next) el.innerHTML='⏳ 已到点，等调度（≤1分钟）<div class="pbar due"><i style="width:100%"></i></div>';
+      else el.innerHTML=`下次抓取 ${fmtHM(next)} · 还剩 ${fmtMMSS(next-now)}<div class="pbar"><i style="width:${pct.toFixed(1)}%"></i></div>`;
+    }else{
+      const times=(s.run_times||'08:00').split(',').map(t=>t.trim()).filter(Boolean);
+      let chips='', nextSlot=null, hasDue=false;
+      for(const hm of times){
+        const p=hm.split(':'); const slot=new Date(now.getFullYear(),now.getMonth(),now.getDate(),+p[0],+p[1]);
+        let cls='todo', icon='';
+        if(slot<=now){
+          if(last&&last>=slot){ cls='done'; icon='✓ '; }       // 今天这个时段已抓过
+          else { cls='due'; icon='⏳ '; hasDue=true; }          // 到点了，等调度
+        }else if(!nextSlot||slot<nextSlot) nextSlot=slot;
+        chips+=`<span class="slot ${cls}">${icon}${hm}</span>`;
+      }
+      const nextTxt=hasDue?'⏳ 已到点，等调度（≤1分钟）'
+        :nextSlot?`下次 ${fmtHM(nextSlot)} · 还剩 ${fmtMMSS(nextSlot-now)}`
+        :`下次 明天 ${times[0]}`;
+      el.innerHTML=chips+`<div style="margin-top:3px">${nextTxt}</div>`;
+    }
+  }
+}
+setInterval(renderNextRun,1000);
+
+async function toggleSrc(id,en){ try{ await api('/mon-source',{action:'toggle',id,enabled:!!en}); loadSources(); }catch(e){ toast(e.message); } }
+async function delSrc(id){ if(!confirm('删除该监控源？（已打星的资讯会保留）')) return; try{ await api('/mon-source',{action:'delete',id}); loadSources(); loadFeed(); }catch(e){ toast(e.message); } }
+
+// ── 抓取 ──
+async function runCrawl(){
+  const btn=document.getElementById('crawlBtn'); btn.disabled=true; const old=btn.textContent; btn.innerHTML='<span class="spinner"></span> 抓取中';
+  try{ await api('/mon-run',{}); toast('抓取完成'); loadSources(); loadFeed(); }
+  catch(e){ toast('抓取失败：'+e.message); }
+  btn.disabled=false; btn.textContent=old;
+}
+
+// ── feed ──
+let lastSig='', pendingStars=0;
+function setFilter(f){ curFilter=f; document.querySelectorAll('#starSeg button').forEach(b=>b.classList.toggle('on',b.dataset.f===f)); loadFeed(); }
+async function loadFeed(force=true){
+  const body=document.getElementById('feedBody');
+  const sourceId=document.getElementById('srcFilter').value;
+  let j; try{ j=await api('/feed',{action:'list',starred:curFilter==='starred',sourceId:sourceId||undefined}); }
+  catch(e){ if(force) body.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; return; }
+  // 静默同步：内容无变化不重绘（避免闪屏 + 不打断阅读）
+  const sig=JSON.stringify(j.items.map(f=>[f.id,f.star,f.read_at?1:0,f.fulltext]));
+  if(!force && sig===lastSig) return;
+  lastSig=sig;
+  const keepScroll=body.scrollTop;
+  knownIds=new Set(j.items.map(f=>f.id));
+  document.getElementById('feedSub').textContent=`${j.items.length} 条`;
+  const legend='<div class="legend">★ 打星即选中并抓全文：<b>★1</b> 存着　<b>★2</b> 今天用　<b>★3</b> 爆点核心。阅读停留 10 秒或点开即记「已读」；已读无星每晚 2:00 自动清。</div>';
+  if(!j.items.length){ body.innerHTML=legend+'<div class="empty">暂无资讯。<br>调度每分钟自动检查到期源；也可点上方「手动抓取」。</div>'; return; }
+  body.innerHTML=legend+j.items.map(fcard).join('');  // 单列表按日期序：已读不挪位，只贴标签
+  body.scrollTop=keepScroll;  // 滚动位置原地保留，不回顶
+  observeUnread();
+}
+function fcard(f){
+  const stars=[1,2,3].map(n=>`<span class="star ${f.star>=n?'lit':''}" onclick="setStar('${f.id}',${n})" title="${STAR_LABEL[n]}">★</span>`).join('');
+  const unstar=f.star>0?`<button class="unstar" onclick="setStar('${f.id}',0)" title="取消星（零星，删除已存全文）">✕ 取消</button>`:'';
+  const date=f.pub_date||((f.fetched_at||'').slice(0,10));
+  return `<div class="fcard ${f.star>0?'starred':''} ${f.read_at?'read':''}" id="card_${f.id}" data-id="${f.id}" data-unread="${f.read_at?0:1}">
+    <div class="fc-row">${f.read_at?'':'<span class="unread-dot" id="dot_'+f.id+'"></span>'}
+    <div class="fc-main">
+    <div class="fc-title"><a href="${esc(f.url)}" target="_blank" rel="noopener" onclick="markRead('${f.id}')">${esc(f.title)}</a></div>
+    <div class="fc-meta"><span>📅 ${esc(date)}</span><span>⏱ 抓取 ${esc(f.fetched_at)}</span><span>${esc(f.source_title||'-')}</span>${f.source_grp?`<span class="grp-tag">${esc(f.source_grp)}</span>`:''}${f.read_at?'<span class="read-tag">✓ 已读</span>':''}</div>
+    <div class="fc-actions">
+      <div class="stars">${stars}</div>${unstar}
+      <span class="star-label" id="lbl_${f.id}">${f.star?STAR_LABEL[f.star]:''}</span>
+      <span style="flex:1"></span>
+      <span id="ft_${f.id}">${f.fulltext?'<span class="ft-badge">✓ 已存全文</span>':''}</span>
+    </div></div></div></div>`;
+}
+async function setStar(id,star){
+  const lbl=document.getElementById('lbl_'+id), ft=document.getElementById('ft_'+id);
+  const card=document.getElementById('card_'+id);
+  card.querySelectorAll('.star').forEach((el,i)=>el.classList.toggle('lit',star>=i+1));
+  card.classList.toggle('starred',star>0);
+  lbl.textContent=star?STAR_LABEL[star]:'';
+  markRead(id); // 做过判断必然已读
+  if(star>0){ ft.innerHTML='<span class="ft-badge"><span class="spinner"></span> 抓全文…</span>'; }
+  pendingStars++;  // 抓全文期间暂停静默重绘，保住转圈反馈
+  try{
+    const j=await api('/feed',{action:'star',id,star});
+    if(star>0){ ft.innerHTML=j.fulltext?'<span class="ft-badge">✓ 已存全文</span>':`<span style="font-size:11px;color:var(--warn)">⚠ ${esc(j.warn||'全文未抓到')}</span>`; }
+    else ft.innerHTML='';
+    if(j.removed){ card.remove(); toast('旧文已移出资讯流'); }
+    loadSources();
+    // 取消星按钮即时增删
+    const un=card.querySelector('.unstar');
+    if(star>0&&!un){ card.querySelector('.stars').insertAdjacentHTML('afterend',`<button class="unstar" onclick="setStar('${id}',0)" title="取消星">✕ 取消</button>`); }
+    if(star===0&&un) un.remove();
+  }catch(e){ toast('打星失败：'+e.message); ft.innerHTML=''; }
+  finally{ pendingStars--; }
+}
+
+// ── 已读判定：入屏停留累计≥3s（仅用户活跃时计时）+ 点开链接 ──
+// 活跃门槛：最近 5 秒内有交互（滚动/鼠标动/触摸/按键）才走表；
+// 闲置或切走标签页 → 计时暂停。页面干放着永远不会自动变已读。
+let readQueue=new Set(), dwellAcc={}, visibleIds=new Set(), lastActivity=0;
+['scroll','wheel','mousemove','mousedown','keydown','touchstart','touchmove'].forEach(ev=>
+  document.addEventListener(ev,()=>{lastActivity=Date.now();},{passive:true,capture:true}));
+const io=new IntersectionObserver(entries=>{
+  for(const en of entries){
+    const id=en.target.dataset.id;
+    if(en.isIntersecting&&en.intersectionRatio>=0.5) visibleIds.add(id);
+    else{ visibleIds.delete(id); delete dwellAcc[id]; }  // 离开视口清进度
+  }
+},{threshold:0.5});
+setInterval(()=>{  // 每秒结算：可见 + 用户活跃 才累计；累计满 3s 即已读
+  if(document.hidden) return;
+  if(Date.now()-lastActivity>5000) return;
+  for(const id of visibleIds){
+    dwellAcc[id]=(dwellAcc[id]||0)+1;
+    if(dwellAcc[id]>=10){ queueRead(id); visibleIds.delete(id); delete dwellAcc[id]; }
+  }
+},1000);
+function observeUnread(){
+  io.disconnect(); visibleIds.clear();
+  document.querySelectorAll('.fcard[data-unread="1"]').forEach(el=>io.observe(el));
+}
+function queueRead(id){
+  const card=document.getElementById('card_'+id);
+  if(!card||card.dataset.unread==='0') return;
+  card.dataset.unread='0'; card.classList.add('read');
+  const dot=document.getElementById('dot_'+id); if(dot) dot.remove();
+  const meta=card.querySelector('.fc-meta');  // 就地贴绿色已读标签（飞书式），卡片不挪位
+  if(meta&&!meta.querySelector('.read-tag')) meta.insertAdjacentHTML('beforeend','<span class="read-tag">✓ 已读</span>');
+  readQueue.add(id);
+}
+function markRead(id){ queueRead(id); flushRead(); }
+async function flushRead(){
+  if(!readQueue.size) return;
+  const ids=[...readQueue]; readQueue.clear();
+  try{ await api('/feed',{action:'read',ids}); }catch(e){ ids.forEach(i=>readQueue.add(i)); }
+}
+window.addEventListener('beforeunload',()=>{ if(readQueue.size) navigator.sendBeacon&&navigator.sendBeacon('/api/feed',JSON.stringify({action:'read',ids:[...readQueue]})); });
+
+// ── 每 3 秒静默同步：上报已读 → 拉最新 → 有变化才重绘（滚动保留、不打断打星抓全文）──
+setInterval(async()=>{
+  await flushRead();
+  if(pendingStars===0) await loadFeed(false);
+},3000);
+// ── 每 10 秒同步监控源面板（外部改了时段/last_run 也能即时反映到灯和倒计时）──
+setInterval(()=>{ if(pendingStars===0) loadSources(); },10000);
+
+// ── 选中计数 / GC ──
+function updatePick(n){ document.getElementById('pickCnt').innerHTML=`★ 已选 <b>${n}</b> 篇`; document.getElementById('confirmBtn').disabled=!n; }
+async function gc(){
+  if(!confirm('立即清理所有无星资讯？（已打星的保留）')) return;
+  try{ const j=await api('/feed',{action:'gc',hours:0}); toast(`已清理 ${j.removed} 条无星资讯`); loadFeed(); loadSources(); }
+  catch(e){ toast(e.message); }
+}
+
+// ── 启动 ──
+(async function(){
+  try{ await fetch('/api/info'); }catch(e){ toast('服务未连接，请先启动 run.py'); }
+  freqChanged(); renderTimes(); await loadSources(); await loadFeed();
+  // 自动接上最近的活跃接入任务（刷新/服务重启后小窗续命，外部工作者的实时日志也能看到）
+  try{
+    const j=await api('/agent-crack',{action:'latest'});
+    if(j.id){ agentTask=j.id;
+      document.getElementById('agentWin').classList.remove('hidden');
+      if(agentTimer) clearInterval(agentTimer);
+      agentTimer=setInterval(agentPoll,2000); agentPoll(); }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

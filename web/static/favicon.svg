@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- 收集App 图标：品牌渐变圆角方 + 打星五角星（与 scripts/make_icons.py 同款设计） -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f5bd5"/>
+      <stop offset="1" stop-color="#8a6cf0"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="url(#g)"/>
+  <polygon fill="#fff" points="50,22 57.4,41.8 78.5,42.7 62,55.9 67.6,76.3 50,64.6 32.4,76.3 38,55.9 21.5,42.7 42.6,41.8"/>
+</svg>

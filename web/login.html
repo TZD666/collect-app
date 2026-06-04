@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>笔记台 · 登录</title>
+<title>收集App · 登录</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="theme-color" content="#4f5bd5">
 <style>
   :root{
     --bg:#f5f6fa; --panel:#ffffff; --line:#e6e7ee; --line2:#eef0f5;
@@ -44,7 +48,11 @@
 <body>
 
 <div class="card">
-  <div class="logo"><span class="dot"></span><span>笔记台 · 收集</span></div>
+  <div style="text-align:center;margin-bottom:18px">
+    <img src="/static/icon-192.png" alt="收集App" style="width:64px;height:64px;border-radius:15px;box-shadow:0 4px 14px rgba(79,91,213,.25)">
+    <div style="font-size:19px;font-weight:600;margin-top:10px">收集App</div>
+    <div style="font-size:12px;color:var(--ink3);margin-top:3px">新闻收集 · 打星筛选工作台</div>
+  </div>
 
   <div class="field">
     <label>用户名</label>
@@ -62,7 +70,7 @@
     <button class="btn btn-accent" id="loginBtn" onclick="login()">登录</button>
   </div>
 
-  <div class="footer">本地单机工具 · 数据存在本机</div>
+  <div class="footer">注册即开通你的专属收集工作台 · 可「添加到主屏幕」当 App 用</div>
 </div>
 
 <div class="toast" id="toast"></div>

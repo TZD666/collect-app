@@ -53,6 +53,32 @@ def _scheduler_loop():
         _stop_event.wait(60)
 
 
+def _lan_ips():
+    """探测本机局域网 IP（多来源候选 + 私网段过滤）。
+
+    只用出口路由法会被代理/VPN 的虚拟网卡（如 198.18.0.0/15 隧道段）骗到，
+    所以再叠加主机名解析候选，统一过滤：仅保留真私网段，优先 192.168.*。
+    """
+    import socket
+    cands = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))   # 不真发包，仅取出口网卡 IP
+        cands.append(s.getsockname()[0])
+        s.close()
+    except Exception:
+        pass
+    try:
+        cands += socket.gethostbyname_ex(socket.gethostname())[2]
+    except Exception:
+        pass
+    private = [ip for ip in dict.fromkeys(cands)   # 去重保序
+               if ip.startswith(("192.168.", "10."))
+               or any(ip.startswith(f"172.{i}.") for i in range(16, 32))]
+    private.sort(key=lambda ip: not ip.startswith("192.168."))  # 家用 WiFi 段排最前
+    return private[:2]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动：建目录 + 初始化库 + 起调度
@@ -72,6 +98,11 @@ async def lifespan(app: FastAPI):
     print(f"✓ 收集App 已启动 → http://{settings.HOST}:{settings.PORT}")
     print(f"  身份模式：{settings.AUTH_MODE}　AI 通道：{settings.DEFAULT_AI_CHANNEL}")
     print("  收集调度：每 60s 增量抓取 · 每晚 2:00 清理已读无星")
+    # HOST=0.0.0.0 时探测局域网 IP，打印手机可访问的地址（探测失败静默跳过）
+    if settings.HOST == "0.0.0.0":
+        for ip in _lan_ips():
+            print(f"  📱 手机同 WiFi 访问：http://{ip}:{settings.PORT}"
+                  "（浏览器菜单「添加到主屏幕」即可装成 App 图标）", flush=True)
     try:
         yield
     finally:

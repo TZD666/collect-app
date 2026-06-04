@@ -1,0 +1,14 @@
+{
+  "name": "收集App",
+  "short_name": "收集",
+  "description": "新闻收集与打星筛选工作台",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#4f5bd5",
+  "background_color": "#f5f6fa",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

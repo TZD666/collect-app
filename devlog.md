@@ -51,3 +51,5 @@
 - 【收尾】run.py setdefault PYTHONUNBUFFERED；调度循环 print 加 flush；db._migrate_source_unique f-string 处注释「collist 来自 PRAGMA，无注入面」。
 - 【测试】pytest 43 绿（新增 enc2 随机性/enc1 兼容/feed 三函数越权防线）；`from app import main` 通过；8777 实测 list 正常、text/plain→422、json→200、enc2 往返成功；app/ web/ 无 `/Users/edy`。
 - 【修复】用户实测发现缺口：后端 /auth/logout 早已就绪但前端无登出入口（多 agent 拼接缝漏点）。index 顶栏补「⎋ 登出」按钮 + 👤 当前用户名（仅 multi 模式显示），curl 全链路验证注册→me→登出→401 通过
+- 【改动】用户端入口收官（用户确认：网址即用户端，不做下载安装包）：App 图标（渐变+五角星，scripts/make_icons.py 生成）、PWA 化（manifest+五页 head 注入+主题色）、登录页门面升级（图标+slogan）、品牌名统一为「收集App」、HOST=0.0.0.0 时启动横幅打印局域网手机访问地址、macOS 双击启动器 启动收集App.command、README 增「📱用户怎么用」「🌐公网部署(Caddy HTTPS)」两节
+- 【清洗】敏感数据收尾：删本地 .bak 迁移备份、清测试账号 tommy2；git 追踪文件审计确认无密钥/个人路径（sk- 均为占位示例）

@@ -1,2 +1,3 @@
 # 开发依赖（测试用，不随应用部署）
 pytest
+pillow            # 构建期：scripts/make_icons.py 生成 App 图标

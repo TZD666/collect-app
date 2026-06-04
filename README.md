@@ -107,6 +107,20 @@ docker compose logs -f
 
 ## 🌐 公网部署（拿到正式网页地址）
 
+### 方案 A：ngrok 免费隧道（零服务器，自己电脑当服务器）
+
+不租服务器也能上公网：本机跑服务 + [ngrok](https://ngrok.com) 隧道（免费注册送 1 个固定域名，自带 HTTPS）。
+
+```bash
+brew install ngrok && ngrok config add-authtoken <你的token>   # 一次性
+./开启公网隧道.command        # 或 .venv/bin/python scripts/ngrok_wrapper.py
+cat ngrok_url.txt             # 当前公网地址（绑定固定域名后永久不变）
+```
+
+> 适合小规模/朋友试用。注意：你的电脑关机/断网服务即不可达；免费版首次访问有一个 ngrok 提示页（点继续即可）。要 7×24 稳定服务请用方案 B。
+
+### 方案 B：云服务器 + 域名（7×24 正式服务）
+
 把服务部署到云服务器并绑定域名后，用户在任何网络都能访问。在 Docker 部署的基础上加一层 HTTPS 反代（推荐 [Caddy](https://caddyserver.com)，两行配置自动签发证书）：
 
 ```bash

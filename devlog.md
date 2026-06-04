@@ -53,3 +53,4 @@
 - 【修复】用户实测发现缺口：后端 /auth/logout 早已就绪但前端无登出入口（多 agent 拼接缝漏点）。index 顶栏补「⎋ 登出」按钮 + 👤 当前用户名（仅 multi 模式显示），curl 全链路验证注册→me→登出→401 通过
 - 【改动】用户端入口收官（用户确认：网址即用户端，不做下载安装包）：App 图标（渐变+五角星，scripts/make_icons.py 生成）、PWA 化（manifest+五页 head 注入+主题色）、登录页门面升级（图标+slogan）、品牌名统一为「收集App」、HOST=0.0.0.0 时启动横幅打印局域网手机访问地址、macOS 双击启动器 启动收集App.command、README 增「📱用户怎么用」「🌐公网部署(Caddy HTTPS)」两节
 - 【清洗】敏感数据收尾：删本地 .bak 迁移备份、清测试账号 tommy2；git 追踪文件审计确认无密钥/个人路径（sk- 均为占位示例）
+- 【改动】公网服务上线（复刻舒尔特方格的 ngrok 方法）：scripts/ngrok_wrapper.py（按端口匹配隧道+多应用 start --all）+ 开启公网隧道.command；ngrok 免费固定域名经用户拍板划给收集App（https://sphinx-throwaway-campsite.ngrok-free.dev → 8780），舒尔特公网下线（本地 8888 照常，其项目内 cloudflared 方案可随时复活）；公网 curl 实测 /api/info 通过。顺带修复舒尔特 ngrok_wrapper 同款「抓第一个隧道」bug

@@ -21,3 +21,6 @@ __pycache__/
 # ── 工具 / 系统 ──
 .omc/
 .DS_Store
+
+# ngrok 公网地址记录（本机运行时产物）
+ngrok_url.txt

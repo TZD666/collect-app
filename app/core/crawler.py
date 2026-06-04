@@ -459,7 +459,8 @@ def crawl_source(conn, src, force=False):
         if pub and pub < cutoff:
             skipped_old += 1
             continue
-        db.feed_add(conn, src["id"], it["title"][:300], u, pub_date=pub)
+        db.feed_add(conn, user_id=src["user_id"], sid=src["id"],
+                    title=it["title"][:300], url=u, pub_date=pub)
         added += 1
     conn.commit()
     db.source_touch(conn, src["id"])
@@ -467,15 +468,18 @@ def crawl_source(conn, src, force=False):
     return added
 
 
-def run(only_source_id=None, force=False):
-    """force=True（手动抓取）：所有启用源无视冷却，按首抓语义重拉。"""
+def run(only_source_id=None, force=False, user_id=None):
+    """force=True（手动抓取）：所有启用源无视冷却，按首抓语义重拉。
+    user_id 给了则只跑该用户的源（手动抓取）；不给则跨全用户（定时调度）。"""
     if not acquire_lock():
         print("已有抓取进程在跑，跳过")
         return
     try:
         conn = db.connect()
         db.init_db(conn)
-        srcs = db.source_list(conn)
+        srcs = db.source_list_all(conn)
+        if user_id is not None:
+            srcs = [s for s in srcs if s["user_id"] == user_id]
         if only_source_id:
             srcs = [s for s in srcs if s["id"] == only_source_id]
             due = srcs  # 指定源忽略冷却

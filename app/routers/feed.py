@@ -9,32 +9,34 @@ import json
 import os
 import time
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends
 from fastapi.responses import JSONResponse
 
 from app.core import db as cdb
 from app.core.fulltext import fetch_fulltext
+from app.deps import current_user
 
 router = APIRouter()
 
 
 @router.post("/feed")
-def feed(payload: dict = Body(...)):
-    """feed 读取 / 打星(触发或删全文) / GC。"""
+def feed(payload: dict = Body(...), user: dict = Depends(current_user)):
+    """feed 读取 / 打星(触发或删全文) / GC（按用户隔离）。"""
     try:
         action = payload.get("action")
+        uid = user["id"]
         conn = cdb.connect()
         cdb.init_db(conn)
         try:
             if action == "list":
                 return {"ok": True,
-                        "items": cdb.feed_list(conn, only_starred=payload.get("starred", False),
+                        "items": cdb.feed_list(conn, uid, only_starred=payload.get("starred", False),
                                                source_id=payload.get("sourceId")),
-                        "stats": cdb.stats(conn)}
+                        "stats": cdb.stats(conn, uid)}
             elif action == "star":
                 fid = payload["id"]
                 star = int(payload.get("star", 0))
-                f = cdb.feed_get(conn, fid)
+                f = cdb.feed_get(conn, fid, uid)
                 if not f:
                     return JSONResponse(status_code=404, content={"error": "feed 不存在"})
                 cdb.feed_set_star(conn, fid, star)
@@ -70,18 +72,21 @@ def feed(payload: dict = Body(...)):
                     return {"ok": True}
             elif action == "read":
                 # 批量标已读（前端入屏≥3s / 点开链接时上报）
-                cdb.feed_mark_read(conn, payload.get("ids", []))
+                cdb.feed_mark_read(conn, payload.get("ids", []), uid)
                 return {"ok": True}
             elif action == "fulltext":
-                # 读取已落盘的全文（总结页阅读用）
-                fp = cdb.fulltext_path(payload["id"])
+                # 读取已落盘的全文（总结页阅读用）。先校验 feed 归属，防越权读他人全文
+                fid = payload["id"]
+                if not cdb.feed_get(conn, fid, uid):
+                    return JSONResponse(status_code=404, content={"error": "feed 不存在"})
+                fp = cdb.fulltext_path(fid)
                 if not os.path.isfile(fp):
                     return JSONResponse(status_code=404, content={"error": "全文未保存或已删除"})
                 with open(fp, encoding="utf-8") as rf:
                     return {"ok": True, "doc": json.load(rf)}
             elif action == "gc":
-                # 手动清理：默认 0 = 立即清所有无星
-                n = cdb.gc(conn, int(payload.get("hours", 0)))
+                # 手动清理：默认 0 = 立即清本用户所有无星
+                n = cdb.gc(conn, user_id=uid, keep_unstarred_hours=int(payload.get("hours", 0)))
                 return {"ok": True, "removed": n}
             else:
                 return JSONResponse(status_code=400, content={"error": f"未知 action: {action}"})

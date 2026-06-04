@@ -37,13 +37,35 @@ RECIPE_SPEC = """你是「监控源接入工程师」，唯一任务：分析给
 要求：宁可保守只命中真实文章行，也不要匹配到导航/页脚/相关推荐；url 可以是相对路径。"""
 
 
-def agent_available():
-    """接入助手是否可用 = 默认 AI 通道的 provider 是否就绪（替代原 CLI_AVAILABLE）。"""
+def agent_available(user=None):
+    """接入助手是否可用 = 该用户解析后 AI 通道的 provider 是否就绪。
+    user=None 时退回实例级默认配置（探活/兜底）。"""
     try:
         from app.llm.base import get_provider
-        return get_provider(settings.default_ai_cfg()).available
+        if user is not None:
+            from app.auth.service import resolve_ai_cfg
+            cfg = resolve_ai_cfg(user)
+        else:
+            cfg = settings.default_ai_cfg()
+        return get_provider(cfg).available
     except Exception:
         return False
+
+
+def _task_cfg(tid):
+    """取任务所属用户的 AI 配置；用户缺失时退回实例级默认。"""
+    t = AGENT_TASKS.get(tid) or {}
+    uid = t.get("user_id")
+    if uid:
+        conn = cdb.connect()
+        try:
+            user = cdb.user_get(conn, uid)
+        finally:
+            conn.close()
+        if user:
+            from app.auth.service import resolve_ai_cfg
+            return resolve_ai_cfg(user)
+    return settings.default_ai_cfg()
 
 
 def _alog(tid, who, text):
@@ -93,10 +115,11 @@ def _probe_channels(tid):
         conn = cdb.connect()
         cdb.init_db(conn)
         try:
-            src = cdb.source_add(conn, src_url, t["params"].get("title") or (pu.netloc + section), src_kind,
-                                 t["params"].get("freq", "daily"), t["params"].get("grp", ""),
-                                 t["params"].get("run_times", "08:00"),
-                                 t["params"].get("backfill_days", 7), recipe)
+            src = cdb.source_add(conn, user_id=t["user_id"], url=src_url,
+                                 title=t["params"].get("title") or (pu.netloc + section), kind=src_kind,
+                                 freq=t["params"].get("freq", "daily"), grp=t["params"].get("grp", ""),
+                                 run_times=t["params"].get("run_times", "08:00"),
+                                 backfill_days=t["params"].get("backfill_days", 7), recipe=recipe)
         except Exception as e:
             _alog(tid, "agent", f"该通道源已存在或入库失败（{e}），继续探下一个…")
             conn.close()
@@ -140,7 +163,7 @@ def _agent_attempts(tid, rounds=2):
         try:
             # 惰性 import：避免启动时 llm 包未就绪报错
             from app.llm.base import get_provider
-            provider = get_provider(settings.default_ai_cfg())
+            provider = get_provider(_task_cfg(tid))
             text = provider.complete(RECIPE_SPEC, user_msg)
         except Exception as e:
             t["history"].append(f"第{n}次：调用 AI 失败 {e}")
@@ -168,11 +191,12 @@ def _agent_attempts(tid, rounds=2):
             conn = cdb.connect()
             cdb.init_db(conn)
             try:
-                src = cdb.source_add(conn, url, t["params"].get("title") or url, "agent",
-                                     t["params"].get("freq", "daily"), t["params"].get("grp", ""),
-                                     t["params"].get("run_times", "08:00"),
-                                     t["params"].get("backfill_days", 7),
-                                     json.dumps(recipe, ensure_ascii=False))
+                src = cdb.source_add(conn, user_id=t["user_id"], url=url,
+                                     title=t["params"].get("title") or url, kind="agent",
+                                     freq=t["params"].get("freq", "daily"), grp=t["params"].get("grp", ""),
+                                     run_times=t["params"].get("run_times", "08:00"),
+                                     backfill_days=t["params"].get("backfill_days", 7),
+                                     recipe=json.dumps(recipe, ensure_ascii=False))
             finally:
                 conn.close()
             t["state"] = "success"

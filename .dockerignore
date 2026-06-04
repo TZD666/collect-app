@@ -1,0 +1,36 @@
+# Git 历史
+.git
+.gitignore
+
+# Python 虚拟环境
+.venv
+__pycache__
+*.pyc
+*.pyo
+
+# 用户数据目录（通过 docker compose volumes 挂载，不打进镜像）
+data
+fulltext
+
+# 私密配置（不打进镜像，通过 env_file 注入）
+.env
+
+# 开发工具 / IDE
+.omc
+.DS_Store
+*.swp
+*.swo
+
+# 文档（不影响运行，减小镜像体积）
+docs
+devlog.md
+CLAUDE.md
+AGENTS.md
+README.md
+
+# 旧版遗留文件（如仍存在）
+server.py
+收集.html
+重点新闻.html
+总结.html
+收集

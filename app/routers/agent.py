@@ -8,29 +8,36 @@ CLI_AVAILABLE 判断改用 agent_tasks.agent_available()（多模型化后统一
 import threading
 import time
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends
 from fastapi.responses import JSONResponse
 
 from app import agent_tasks
 from app.agent_tasks import AGENT_TASKS, _alog, _agent_attempts, agent_available
+from app.deps import current_user
 
 router = APIRouter()
 
 
+def _own(t, user):
+    """任务归属校验：仅本人任务可见（task["user_id"]==user["id"]）。"""
+    return t is not None and t.get("user_id") == user["id"]
+
+
 @router.post("/agent-crack")
-def agent_crack(payload: dict = Body(...)):
-    """接入助手任务：start 起线程分析 / status 轮询日志 / say 递线索续跑。"""
+def agent_crack(payload: dict = Body(...), user: dict = Depends(current_user)):
+    """接入助手任务（按用户隔离）：start 起线程分析 / status 轮询日志 / say 递线索续跑。"""
     try:
         action = payload.get("action")
+        uid = user["id"]
         if action == "start":
-            if not agent_available():
+            if not agent_available(user):
                 return {"ok": False, "error": "本机无可用 AI 通道，接入助手不可用"}
             url = (payload.get("url") or "").strip()
             if not url:
                 return JSONResponse(status_code=400, content={"error": "缺少 url"})
             tid = f"ac_{int(time.time()*1000)}"
             AGENT_TASKS[tid] = {
-                "id": tid, "url": url, "state": "running",
+                "id": tid, "user_id": uid, "url": url, "state": "running",
                 "log": [], "hints": [], "history": [], "html": "",
                 "params": {k: payload.get(k) for k in ("title", "grp", "freq", "run_times", "backfill_days")},
                 "source": None, "preview": [],
@@ -42,7 +49,7 @@ def agent_crack(payload: dict = Body(...)):
         elif action == "log":
             # 外部工作者实时回报：往任务日志追加一行，可顺带改状态/挂结果
             t = AGENT_TASKS.get(payload.get("id"))
-            if not t:
+            if not _own(t, user):
                 return JSONResponse(status_code=404, content={"error": "任务不存在"})
             _alog(t["id"], payload.get("who", "agent"), payload.get("text", ""))
             if payload.get("state") in ("running", "waiting", "success"):
@@ -51,8 +58,9 @@ def agent_crack(payload: dict = Body(...)):
                 t["source"] = payload["source"]
             return {"ok": True}
         elif action == "latest":
-            # 页面启动时自动接上最近的活跃任务（服务重启/刷新后续命）
-            live = [t for t in AGENT_TASKS.values() if t["state"] in ("running", "waiting")]
+            # 页面启动时自动接上本人最近的活跃任务（服务重启/刷新后续命）
+            live = [t for t in AGENT_TASKS.values()
+                    if t.get("user_id") == uid and t["state"] in ("running", "waiting")]
             live.sort(key=lambda t: t["id"], reverse=True)
             if live:
                 return {"ok": True, "id": live[0]["id"], "state": live[0]["state"]}
@@ -60,13 +68,13 @@ def agent_crack(payload: dict = Body(...)):
                 return {"ok": True, "id": None}
         elif action == "status":
             t = AGENT_TASKS.get(payload.get("id"))
-            if not t:
+            if not _own(t, user):
                 return JSONResponse(status_code=404, content={"error": "任务不存在（服务可能重启过）"})
             return {"ok": True, "state": t["state"], "log": t["log"],
                     "source": t.get("source"), "preview": t.get("preview", [])}
         elif action == "say":
             t = AGENT_TASKS.get(payload.get("id"))
-            if not t:
+            if not _own(t, user):
                 return JSONResponse(status_code=404, content={"error": "任务不存在（服务可能重启过）"})
             text = (payload.get("text") or "").strip()
             if not text:

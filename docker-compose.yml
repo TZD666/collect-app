@@ -1,0 +1,18 @@
+# 收集App — Docker Compose 部署配置
+# 首次使用：cp .env.example .env，按需修改（AUTH_MODE=multi + SECRET_KEY）
+# 启动：docker compose up -d
+# 查看日志：docker compose logs -f
+
+services:
+  collect:
+    build: .
+    ports:
+      - "8770:8770"
+    # env_file 注入 .env 配置（.env 不入 git，首次部署需从 .env.example 复制）
+    env_file:
+      - .env
+    volumes:
+      # 用户数据持久化到宿主机目录（容器销毁不丢数据）
+      - ./data:/app/data
+      - ./fulltext:/app/fulltext
+    restart: unless-stopped

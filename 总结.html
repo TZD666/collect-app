@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>笔记台 · 总结（简版）</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --panel:#ffffff; --line:#e6e7ee; --line2:#eef0f5;
+    --ink:#1f1f29; --ink2:#5f6168; --ink3:#9498a3;
+    --accent:#4f5bd5; --accent-soft:#eef0ff;
+    --chip:#f1f2f6; --dark:#1f1f29; --studio:#f3eeff;
+    --ok:#2e9e6b; --warn:#c98a14; --danger:#d2463c; --star:#e8a317;
+    --radius:14px; --shadow:0 1px 3px rgba(20,20,40,.06),0 4px 16px rgba(20,20,40,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:14px/1.6 -apple-system,'PingFang SC','Helvetica Neue',sans-serif;color:var(--ink);background:var(--bg);height:100vh;overflow:hidden}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  .hidden{display:none!important}
+  .topbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .logo{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:600}
+  .logo .dot{width:24px;height:24px;border-radius:50%;background:conic-gradient(from 180deg,#4f5bd5,#8a6cf0,#d56ba8,#4f5bd5)}
+  .topbar .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:20px;font-size:13px;font-weight:500;transition:.15s}
+  .btn-line{border:1px solid var(--line);color:var(--ink2)}.btn-line:hover{background:var(--chip)}
+  .btn-ghost{color:var(--ink2)}.btn-ghost:hover{background:var(--chip)}
+  .back{font-size:18px;color:var(--ink2);padding:4px 10px;border-radius:8px}
+  .back:hover{background:var(--chip)}
+
+  .main{height:calc(100vh - 56px);overflow-y:auto;padding:24px 36px 60px;max-width:880px;margin:0 auto}
+  .note{font-size:12px;color:var(--ink3);background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:9px 14px;margin-bottom:18px;line-height:1.7}
+  .sec{margin-bottom:26px}
+  .sec-h{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;margin-bottom:11px}
+  .sec-h .stars{color:var(--star);letter-spacing:1px}
+  .sec-h .n{font-size:11px;background:var(--accent-soft);color:var(--accent);padding:1px 8px;border-radius:9px}
+  .sec-h .d{font-size:12px;color:var(--ink3);font-weight:400}
+  .acard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 17px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .acard.s3{border-left:3px solid var(--star)}
+  .acard .at{font-size:14.5px;font-weight:600;line-height:1.5;cursor:pointer}
+  .acard .at:hover{color:var(--accent)}
+  .acard .am{font-size:11.5px;color:var(--ink3);margin-top:5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .acard .aa{display:flex;gap:10px;margin-top:9px;align-items:center}
+  .mini{font-size:12px;padding:4px 11px;border-radius:9px;border:1px solid var(--line);color:var(--ink2)}
+  .mini:hover{background:var(--chip)}
+  .mini.danger:hover{color:var(--danger);border-color:var(--danger)}
+  .empty{text-align:center;color:var(--ink3);font-size:13px;padding:60px 20px;line-height:2}
+
+  /* 阅读弹层 */
+  .overlay{position:fixed;inset:0;background:rgba(30,30,50,.4);display:flex;align-items:center;justify-content:center;z-index:50}
+  .reader{background:var(--panel);border-radius:16px;width:760px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 50px rgba(0,0,0,.25)}
+  .reader-h{display:flex;align-items:flex-start;gap:12px;padding:20px 24px 10px;border-bottom:1px solid var(--line2)}
+  .reader-h h2{flex:1;font-size:17px;line-height:1.5}
+  .reader-h .x{font-size:20px;color:var(--ink3);padding:2px 9px;border-radius:8px}
+  .reader-h .x:hover{background:var(--chip)}
+  .reader-m{font-size:12px;color:var(--ink3);padding:8px 24px;display:flex;gap:14px}
+  .reader-m a{color:var(--accent)}
+  .reader-body{flex:1;overflow-y:auto;padding:14px 24px 26px;font-size:14.5px;line-height:1.9;white-space:pre-wrap}
+
+  .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;z-index:80;opacity:0;transition:.25s}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="back" onclick="location.href='收集.html'">←</button>
+  <div class="logo"><span class="dot"></span><span>笔记台 · 总结 <span style="font-size:12px;color:var(--ink3);font-weight:400">阶段二 · 简版</span></span></div>
+  <div class="spacer"></div>
+  <span style="font-size:12px;color:var(--ink3)" id="statLine"></span>
+  <button class="btn btn-line" onclick="location.href='重点新闻.html'">★ 重点新闻</button>
+</div>
+
+<div class="main">
+  <div class="note">当天工作集：只收 <b>★3 爆点</b> 与 <b>★2 今天用</b>。★1 的存档在「★ 重点新闻」里（可随时调星升进来）。「✕ 移出」= 取消星并删除已存全文。完整的总结/分析能力（功能二）后续在此页生长。</div>
+  <div id="content"></div>
+</div>
+
+<!-- 阅读弹层 -->
+<div class="overlay hidden" id="readerOverlay" onclick="if(event.target===this)closeReader()">
+  <div class="reader">
+    <div class="reader-h"><h2 id="rTitle"></h2><button class="x" onclick="closeReader()">✕</button></div>
+    <div class="reader-m"><span id="rMeta"></span><a id="rLink" href="#" target="_blank" rel="noopener">原文链接 ↗</a></div>
+    <div class="reader-body" id="rBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API='http://127.0.0.1:8770';
+const TIERS=[
+  {star:3,label:'爆点 · 核心选题',desc:'单独围绕做话题'},
+  {star:2,label:'今天用 · 非重点',desc:'本期辅助素材'},
+];  // ★1 仅存档于「重点新闻」，不进当天总结
+async function api(path, body){
+  const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!r.ok||j.ok===false||j.error) throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+async function load(){
+  let j; try{ j=await api('/feed',{action:'list',starred:true}); }
+  catch(e){ document.getElementById('content').innerHTML='<div class="empty">加载失败：'+esc(e.message)+'<br>请确认桥接服务（8770）在跑。</div>'; return; }
+  j.items=j.items.filter(f=>f.star>=2);  // ★1 不进当天总结，只在「重点新闻」档案库
+  document.getElementById('statLine').textContent=`共 ${j.items.length} 篇 · 全文已存 ${j.items.filter(f=>f.fulltext).length} 篇`;
+  if(!j.items.length){ document.getElementById('content').innerHTML='<div class="empty">当天总结还是空的。<br>去「← 收集」页给资讯打 ★2/★3，或在「★ 重点新闻」里把存档调成 ★2/★3。</div>'; return; }
+  let html='';
+  for(const t of TIERS){
+    const items=j.items.filter(f=>f.star===t.star);
+    if(!items.length) continue;
+    html+=`<div class="sec"><div class="sec-h"><span class="stars">${'★'.repeat(t.star)}</span> ${t.label} <span class="n">${items.length}</span><span class="d">${t.desc}</span></div>`
+      +items.map(f=>acard(f)).join('')+'</div>';
+  }
+  document.getElementById('content').innerHTML=html;
+}
+function acard(f){
+  const date=f.pub_date||((f.fetched_at||'').slice(0,10));
+  return `<div class="acard ${f.star===3?'s3':''}" id="a_${f.id}">
+    <div class="at" onclick="openReader('${f.id}')">${esc(f.title)}</div>
+    <div class="am"><span>📅 ${esc(date)}</span><span>⏱ 抓取 ${esc(f.fetched_at)}</span><span>${esc(f.source_title||'-')}</span>${f.fulltext?'<span style="color:var(--ok)">✓ 全文已存</span>':'<span style="color:var(--warn)">⚠ 无全文</span>'}</div>
+    <div class="aa">
+      <button class="mini" onclick="openReader('${f.id}')">📖 读全文</button>
+      <a class="mini" style="text-decoration:none" href="${esc(f.url)}" target="_blank" rel="noopener">原文 ↗</a>
+      <span style="flex:1"></span>
+      <button class="mini danger" onclick="unstar('${f.id}')">✕ 移出</button>
+    </div></div>`;
+}
+async function openReader(id){
+  try{
+    const j=await api('/feed',{action:'fulltext',id});
+    document.getElementById('rTitle').textContent=j.doc.title||'(无标题)';
+    document.getElementById('rMeta').textContent=`${(j.doc.text||'').length} 字`;
+    document.getElementById('rLink').href=j.doc.source_url||'#';
+    document.getElementById('rBody').textContent=j.doc.text||'(全文为空)';
+    document.getElementById('readerOverlay').classList.remove('hidden');
+  }catch(e){ toast('打开失败：'+e.message); }
+}
+function closeReader(){ document.getElementById('readerOverlay').classList.add('hidden'); }
+async function unstar(id){
+  if(!confirm('移出总结页？（取消星并删除已存全文）')) return;
+  try{ await api('/feed',{action:'star',id,star:0}); document.getElementById('a_'+id).remove(); toast('已移出'); load(); }
+  catch(e){ toast(e.message); }
+}
+load();
+</script>
+</body>
+</html>

@@ -8,8 +8,8 @@
   · 同源静态托管 web/（单文件全中文前端）。
 
 调度线程迁自 server.py 的 _collect_scheduler：每轮 crawler.run() 增量抓取，
-每晚 2:00 清「已读且无星」（幂等一天一次），用 threading.Event().wait(60)
-替代 sleep——退出时 stop.set() 可即时唤醒优雅退出。
+每晚 2:00 全清资讯流（无星删除、打星归档进重点新闻；幂等一天一次），
+用 threading.Event().wait(60) 替代 sleep——退出时 stop.set() 可即时唤醒优雅退出。
 """
 import os
 import threading
@@ -29,7 +29,7 @@ _stop_event = threading.Event()
 
 
 def _scheduler_loop():
-    """后台调度：每 60s 增量抓取一轮 + 每晚 2:00 清已读无星（幂等）。
+    """后台调度：每 60s 增量抓取一轮 + 每晚 2:00 全清资讯流（无星删、打星归档；幂等）。
     异常打印中文继续，不让单次失败拖垮整个调度。"""
     from app.core import crawler
     while not _stop_event.is_set():
@@ -41,12 +41,15 @@ def _scheduler_loop():
             conn = db.connect()
             db.init_db(conn)
             today = time.strftime("%Y-%m-%d")
-            # last_read_clean 用全局态（user_id=''）：一天一次幂等，不分用户
-            if time.localtime().tm_hour == 2 and db.meta_get(conn, "last_read_clean") != today:
-                n = db.gc_read(conn)         # 全用户一起清已读无星
+            # last_read_clean 用全局态（user_id=''）：一天一次幂等，不分用户。
+            # 补偿式触发：不再死等「恰好 tm_hour==2」那一刻——只要当天还没清过且已过 2:00 就清。
+            # 个人 Mac 半夜睡眠会错过 2 点窗口（进程被挂起），改这样后醒来当天首次跑到这里即补清。
+            # before_date=today：只清「今天之前」的条目，避免补偿时误删当天还没来得及筛选的新条目。
+            if time.localtime().tm_hour >= 2 and db.meta_get(conn, "last_read_clean") != today:
+                n_del, n_arc = db.feed_daily_clear(conn, before_date=today)  # 无星删除、打星归档进重点新闻
                 db.session_gc(conn)          # 顺手清过期会话
                 db.meta_set(conn, "last_read_clean", today)
-                print(f"[收集调度] 2:00 已读清理：{n} 条", flush=True)
+                print(f"[收集调度] 资讯流日清（今天之前·补偿式）：删除 {n_del} 条 / 归档 {n_arc} 条", flush=True)
             conn.close()
         except Exception as e:
             print(f"[收集调度] 清理异常：{e}", flush=True)
@@ -97,7 +100,7 @@ async def lifespan(app: FastAPI):
     t.start()
     print(f"✓ 收集App 已启动 → http://{settings.HOST}:{settings.PORT}")
     print(f"  身份模式：{settings.AUTH_MODE}　AI 通道：{settings.DEFAULT_AI_CHANNEL}")
-    print("  收集调度：每 60s 增量抓取 · 每晚 2:00 清理已读无星")
+    print("  收集调度：每 60s 增量抓取 · 每晚 2:00 全清资讯流（打星归档进重点新闻）")
     # HOST=0.0.0.0 时探测局域网 IP，打印手机可访问的地址（探测失败静默跳过）
     if settings.HOST == "0.0.0.0":
         for ip in _lan_ips():

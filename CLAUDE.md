@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 「收集App」：帮社媒运营从业者快速收集和筛选关注领域的新闻。监控源 → 调度抓取出 feed 信息流 → 人工打星筛选（★1 存档 / ★2 今天用 / ★3 爆点）→ 打星才抓全文留存 → 高分文章供下一模块（功能二「总结」）使用。
 
-2026-06-04 完成工程化改造（从笔记台单机 demo → 标准 Web 服务）：FastAPI + 多用户身份层 + AI 多模型适配，同一份代码本地直跑或 Docker 服务器部署。产品蓝图与历史决策在 `docs/`（功能梳理.md 总纲、功能一-实现目标.md D1-D5 决策）。改造前的 demo 形态保留在 `/Users/edy/Desktop/笔记台`（本仓库 git 基线提交也是它）。
+2026-06-04 完成工程化改造（从笔记台单机 demo → 标准 Web 服务）：FastAPI + 多用户身份层 + AI 多模型适配，同一份代码本地直跑或 Docker 服务器部署。产品蓝图与历史决策在 `docs/`（功能梳理.md 总纲、功能一-实现目标.md D1-D5 决策）。改造前的 demo 形态保留在本机「笔记台」目录（本仓库 git 基线提交也是它）。
 
 ## 运行 / 开发
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 首次
-.venv/bin/python run.py                  # 起服务 → http://127.0.0.1:8770（默认 single 模式免登录）
+.venv/bin/python run.py                  # 起服务 → http://127.0.0.1:8780（端口由 .env 的 PORT 决定，本机实际用 8780；single 模式免登录）
 cp .env.example .env                     # 需要改配置时（端口/AUTH_MODE/AI 默认通道等）
 
 .venv/bin/python -m pytest -q            # 38 个测试（db 多租户隔离 + auth），需先装 requirements-dev.txt

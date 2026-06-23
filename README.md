@@ -24,7 +24,7 @@
 
 ```bash
 # 1. 克隆仓库
-git clone <仓库地址>
+git clone https://github.com/TZD666/collect-app.git
 cd collect-app
 
 # 2. 创建虚拟环境并安装依赖
@@ -54,7 +54,7 @@ python run.py
 
 ```bash
 # 1. 克隆仓库
-git clone <仓库地址>
+git clone https://github.com/TZD666/collect-app.git
 cd collect-app
 
 # 2. 复制配置文件并修改关键项
@@ -289,3 +289,11 @@ Docker 部署时通过 `volumes` 挂载到宿主机，容器销毁后数据不�
 - **最小依赖**：`fastapi` / `uvicorn[standard]` / `python-multipart`，无 ORM / Redis / Celery
 - **全中文**：界面、注释、报错信息统一使用中文
 - **stdlib 优先**：配置读取、密码 hash（scrypt）、HTTP 请求（urllib）均用标准库，减少依赖链风险
+
+---
+
+## License
+
+[MIT](LICENSE) © Zhide Tang
+
+<!-- C2M_zhideTang -->

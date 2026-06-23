@@ -194,6 +194,53 @@ class TestGC:
         assert db.feed_get(conn, fid_a) is None
         assert db.feed_get(conn, fid_b) is not None  # B 的保留
 
+    def test_feed_daily_clear_无星删_打星归档(self, conn):
+        """2:00 全清：无星（含已读/未读）删除；打星条目归档（archived=1）保留。"""
+        src = _add_src(conn, "u_a")
+        fid_read    = _add_feed(conn, "u_a", src["id"], url="http://a.com/1")  # 已读无星
+        fid_unread  = _add_feed(conn, "u_a", src["id"], url="http://a.com/2")  # 未读无星
+        fid_starred = _add_feed(conn, "u_a", src["id"], url="http://a.com/3")  # 打星
+
+        db.feed_mark_read(conn, [fid_read], "u_a")
+        db.feed_set_star(conn, fid_starred, 2, "u_a")
+
+        n_del, n_arc = db.feed_daily_clear(conn, user_id="u_a")
+        assert (n_del, n_arc) == (2, 1)  # 两条无星全删（已读+未读）、一条打星归档
+
+        assert db.feed_get(conn, fid_read) is None      # 无星已读 → 删
+        assert db.feed_get(conn, fid_unread) is None     # 无星未读 → 删（与 gc_read 不同）
+        assert db.feed_get(conn, fid_starred) is not None  # 打星 → 保留
+        assert db.feed_get(conn, fid_starred)["archived"] == 1  # 已归档
+
+    def test_feed_daily_clear_归档移出资讯流_留在重点新闻(self, conn):
+        """归档后：资讯流（only_starred=False）看不到；重点新闻（only_starred=True）仍在。"""
+        src = _add_src(conn, "u_a")
+        fid_starred = _add_feed(conn, "u_a", src["id"], url="http://a.com/1")
+        db.feed_set_star(conn, fid_starred, 3, "u_a")
+
+        db.feed_daily_clear(conn, user_id="u_a")
+
+        assert db.feed_list(conn, "u_a") == []                       # 资讯流已清空
+        starred = db.feed_list(conn, "u_a", only_starred=True)
+        assert len(starred) == 1 and starred[0]["id"] == fid_starred  # 重点新闻保留
+
+    def test_feed_daily_clear_幂等_只清目标用户(self, conn):
+        """再跑一次不重复归档；user_id=A 不动 B 的数据。"""
+        src_a = _add_src(conn, "u_a", url="http://a.com/rss")
+        src_b = _add_src(conn, "u_b", url="http://b.com/rss")
+        fid_a = _add_feed(conn, "u_a", src_a["id"], url="http://a.com/1")
+        fid_b = _add_feed(conn, "u_b", src_b["id"], url="http://b.com/1")
+        db.feed_set_star(conn, fid_a, 1, "u_a")
+        db.feed_set_star(conn, fid_b, 1, "u_b")
+
+        n_del, n_arc = db.feed_daily_clear(conn, user_id="u_a")
+        assert (n_del, n_arc) == (0, 1)
+        # 第二次：已归档不再计入
+        n_del2, n_arc2 = db.feed_daily_clear(conn, user_id="u_a")
+        assert (n_del2, n_arc2) == (0, 0)
+        # B 未受影响（仍未归档）
+        assert db.feed_get(conn, fid_b)["archived"] == 0
+
 
 # ── init_db 幂等 + 旧版迁移 ──────────────────────────────────────
 

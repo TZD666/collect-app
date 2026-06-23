@@ -253,7 +253,7 @@ function hideTimePick(){ document.getElementById('timePickRow').classList.add('h
 function confirmTime(){ const v=document.getElementById('timeInput').value; if(v&&!timesList.includes(v)){ timesList.push(v); timesList.sort(); renderTimes(); } hideTimePick(); }
 function rmTime(i){ timesList.splice(i,1); renderTimes(); }
 async function loadSources(){
-  let j; try{ j=await api('/mon-source',{action:'list'}); }catch(e){ toast('服务未连接：'+e.message); return; }
+  let j; try{ j=await api('/mon-source',{action:'list'}); }catch(e){ return; }  // 后台轮询断线时静默跳过，等下一轮自动恢复，不弹窗骚扰
   sources=j.sources;
   document.getElementById('srcCount').textContent=sources.length?`${sources.length} 个`:'';
   document.getElementById('statLine').textContent=
@@ -612,7 +612,7 @@ async function chatSend(){
         const w=document.getElementById('whoami'); w.textContent='👤 '+me.username; w.classList.remove('hidden');
       }catch(e){}  // 未登录时 api() 已自动跳 /login.html
     }
-  }catch(e){ toast('服务未连接，请先启动 run.py'); }
+  }catch(e){ /* 顶栏信息拉取失败时静默处理，不再弹断线提示窗 */ }
   freqChanged(); renderTimes(); await loadSources(); await loadFeed();
   // 自动接上最近的活跃接入任务（刷新/服务重启后小窗续命，外部工作者的实时日志也能看到）
   try{

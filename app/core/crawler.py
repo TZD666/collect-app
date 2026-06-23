@@ -19,6 +19,7 @@
   python -m app.core.crawler --test <url># 试抓某 URL，输出可解析条目数（加源校验用）
 """
 import html as html_lib
+import http.client
 import json
 import os
 import re
@@ -70,7 +71,12 @@ def extract_pub_date(url, raw_date=""):
 def fetch(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=25) as resp:
-        raw = resp.read()
+        try:
+            raw = resp.read()
+        except http.client.IncompleteRead as e:
+            # 反爬站（路透等）常先传一段再掐断连接，read() 会抛 IncompleteRead。
+            # 抢救已收到的字节交给解析层——sitemap/RSS 截断后仍能救出前面的完整条目。
+            raw = e.partial
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
@@ -83,12 +89,45 @@ def _localname(tag):
 
 
 # ── 解析：RSS / Atom / sitemap 三合一 ───────────────────────────
+def _salvage_truncated_xml(xml_text):
+    """反爬站半截掐断时尾部不完整 → 截到最后一个完整条目并补齐根闭合标签，尽量救出已完整的条目。
+    无法识别结构则返回 None。"""
+    s = xml_text if isinstance(xml_text, str) else xml_text.decode("utf-8", "replace")
+    m = re.search(r"<([A-Za-z][\w:.-]*)[\s>]", s)
+    if not m:
+        return None
+    rootln = m.group(1).rsplit(":", 1)[-1].lower()
+    # 根类型 → (条目级闭合标签, 需补的根闭合序列)
+    plan = {"urlset": ("</url>", ["urlset"]),
+            "rss": ("</item>", ["channel", "rss"]),
+            "feed": ("</entry>", ["feed"])}.get(rootln)
+    if not plan:
+        return None
+    entry_close, closers = plan
+    idx = s.rfind(entry_close)
+    if idx == -1:
+        return None
+    s = s[:idx + len(entry_close)]
+    for c in closers:  # 用原文里的真实写法补闭合（可能带命名空间前缀）
+        mm = re.search(r"<((?:[\w.-]+:)?%s)[\s>]" % c, xml_text if isinstance(xml_text, str)
+                       else xml_text.decode("utf-8", "replace"))
+        s += "</%s>" % (mm.group(1) if mm else c)
+    return s
+
+
 def parse_feed(xml_text):
     """返回 (kind, items)；items=[{title,url,date}]。无法解析则 kind=None。"""
     try:
         root = ET.fromstring(xml_text.encode("utf-8") if isinstance(xml_text, str) else xml_text)
     except ET.ParseError:
-        return None, []
+        salvaged = _salvage_truncated_xml(xml_text)  # 半截掐断时抢救前面的完整条目
+        if salvaged:
+            try:
+                root = ET.fromstring(salvaged.encode("utf-8"))
+            except ET.ParseError:
+                return None, []
+        else:
+            return None, []
 
     rootname = _localname(root.tag)
 

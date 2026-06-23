@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS feed (
     read_at    TEXT DEFAULT '',     -- 已读时间（入屏≥3s 或点开链接）
     star       INTEGER DEFAULT 0,   -- 0 无星 / 1 / 2 / 3
     fulltext   INTEGER DEFAULT 0,   -- 是否已抓全文落盘
-    pinned_to  TEXT DEFAULT ''      -- 挂到某工作流则豁免 GC
+    pinned_to  TEXT DEFAULT '',     -- 挂到某工作流则豁免 GC
+    archived   INTEGER DEFAULT 0    -- 已归档：每晚 2:00 起从资讯流移出，仅在「重点新闻」存档
 );
 CREATE TABLE IF NOT EXISTS meta (
     user_id TEXT DEFAULT '',
@@ -101,6 +102,8 @@ _MIGRATIONS = (
     # 多租户：存量 source/feed 补 user_id，缺省归默认用户
     "ALTER TABLE source ADD COLUMN user_id TEXT DEFAULT 'u_default'",
     "ALTER TABLE feed ADD COLUMN user_id TEXT DEFAULT 'u_default'",
+    # 每晚 2:00 全清资讯流：打星条目置 archived=1 移出资讯流，仅留在「重点新闻」存档
+    "ALTER TABLE feed ADD COLUMN archived INTEGER DEFAULT 0",
 )
 
 
@@ -318,12 +321,15 @@ def feed_add(conn, *, user_id, sid, title, url, pub_date=""):
 
 
 def feed_list(conn, user_id, only_starred=False, source_id=None):
-    """按报道日期（无则抓取日）倒序；已读不影响排序——卡片位置稳定，已读仅贴标签。"""
+    """按报道日期（无则抓取日）倒序；已读不影响排序——卡片位置稳定，已读仅贴标签。
+    资讯流（only_starred=False）只看未归档；重点新闻/总结（only_starred=True）含归档存档。"""
     q = "SELECT f.*, s.title AS source_title, s.grp AS source_grp " \
         "FROM feed f LEFT JOIN source s ON s.id=f.source_id WHERE f.user_id=?"
     args = [user_id]
     if only_starred:
-        q += " AND f.star>0"
+        q += " AND f.star>0"          # 重点新闻档案：含已归档的打星条目
+    else:
+        q += " AND f.archived=0"      # 资讯流：2:00 起归档的条目不再出现
     if source_id:
         q += " AND f.source_id=?"
         args.append(source_id)
@@ -424,12 +430,45 @@ def gc_read(conn, user_id=None):
     return len(ids)
 
 
+def feed_daily_clear(conn, user_id=None, before_date=None):
+    """每晚 2:00 全清资讯流：无星条目（含已读/未读）直接删除；打星条目置 archived=1
+    —— 从资讯流移出，但保留在「重点新闻」档案（连同日期、全文）。pinned_to 工作流仍豁免。
+    user_id=None = 所有用户一起处理（调度器用）；给了则只处理该用户。
+    before_date 给定（'YYYY-MM-DD'）则只处理抓取日 < before_date 的条目——补偿清理
+    （电脑睡过 2:00、醒来后补清）时用它把范围限在「今天之前」，避免误删当天还没筛选的新条目。
+    返回 (删除数, 归档数)。"""
+    q_del = "SELECT id FROM feed WHERE star=0 AND pinned_to='' AND archived=0"
+    q_arc = "SELECT id FROM feed WHERE star>0 AND archived=0"
+    args = []
+    if user_id is not None:
+        q_del += " AND user_id=?"
+        q_arc += " AND user_id=?"
+        args.append(user_id)
+    if before_date:
+        q_del += " AND substr(fetched_at,1,10) < ?"
+        q_arc += " AND substr(fetched_at,1,10) < ?"
+        args.append(before_date)
+    del_ids = [r["id"] for r in conn.execute(q_del, args).fetchall()]
+    arc_ids = [r["id"] for r in conn.execute(q_arc, args).fetchall()]
+    for fid in del_ids:
+        fulltext_delete(fid)  # 无星理论上无全文，稳妥起见也清
+    if del_ids:
+        conn.executemany("DELETE FROM feed WHERE id=?", [(i,) for i in del_ids])
+    if arc_ids:
+        conn.executemany("UPDATE feed SET archived=1 WHERE id=?", [(i,) for i in arc_ids])
+    if del_ids or arc_ids:
+        conn.commit()
+    return len(del_ids), len(arc_ids)
+
+
 def stats(conn, user_id):
+    # feed_total/unread 只算资讯流（未归档）——归档条目已移出资讯流，仅在重点新闻；
+    # starred/star3/fulltext 算全量（含归档），反映「重点新闻」档案规模。
     one = lambda q: conn.execute(q, (user_id,)).fetchone()[0]
     return {
         "sources": one("SELECT COUNT(*) FROM source WHERE user_id=?"),
-        "feed_total": one("SELECT COUNT(*) FROM feed WHERE user_id=?"),
-        "unread": one("SELECT COUNT(*) FROM feed WHERE user_id=? AND read_at=''"),
+        "feed_total": one("SELECT COUNT(*) FROM feed WHERE user_id=? AND archived=0"),
+        "unread": one("SELECT COUNT(*) FROM feed WHERE user_id=? AND read_at='' AND archived=0"),
         "starred": one("SELECT COUNT(*) FROM feed WHERE user_id=? AND star>0"),
         "star3": one("SELECT COUNT(*) FROM feed WHERE user_id=? AND star=3"),
         "fulltext": one("SELECT COUNT(*) FROM feed WHERE user_id=? AND fulltext=1"),

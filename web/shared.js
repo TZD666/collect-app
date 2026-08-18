@@ -9,9 +9,21 @@ async function api(path, body) {
     body: JSON.stringify(body)
   });
   if (r.status === 401) { location.href = '/login.html'; throw new Error('未登录'); }
-  const j = await r.json();
+  const text = await r.text();
+  let j = null;
+  if (text) {
+    try {
+      j = JSON.parse(text);
+    } catch (e) {
+      const err = new Error(text.slice(0, 300) || ('HTTP ' + r.status));
+      err.raw = text;
+      throw err;
+    }
+  } else {
+    j = {};
+  }
   if (!r.ok || j.ok === false || j.error) {
-    const err = new Error(j.error || ('HTTP ' + r.status));
+    const err = new Error(j.error || j.detail || ('HTTP ' + r.status));
     err.payload = j;
     throw err;
   }

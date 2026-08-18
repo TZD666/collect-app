@@ -16,7 +16,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -124,6 +124,13 @@ async def _http_exc_handler(request, exc: HTTPException):
     if isinstance(detail, dict):
         return JSONResponse(status_code=exc.status_code, content=detail)
     return JSONResponse(status_code=exc.status_code, content={"error": str(detail)})
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exc_handler(request: Request, exc: Exception):
+    """避免前端收到纯文本 Internal Server Error 后 JSON.parse 二次报错。"""
+    print(f"[未捕获异常] {request.method} {request.url.path}: {exc}", flush=True)
+    return JSONResponse(status_code=500, content={"error": f"服务端错误：{exc}"})
 
 
 # 业务路由（统一 /api 前缀）
